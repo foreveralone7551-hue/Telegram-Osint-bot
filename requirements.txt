@@ -1,6 +1,5 @@
-﻿python-telegram-bot==20.4
-requests
-python-dotenv
-Pillow
+python-telegram-bot>=20.7
+httpx>=0.27.0
+httpcore>=1.0.8
 
 
