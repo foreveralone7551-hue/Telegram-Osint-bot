@@ -1,71 +1,75 @@
 import os
 import requests
-import html
-import re
-from urllib.parse import urlparse
+import base64
 
+VT_API_KEY = os.environ.get("VIRUSTOTAL_API_KEY")
+VT_URL = "https://www.virustotal.com/api/v3/urls"
 
-def _normalize_url(link: str) -> str:
-	"""Fix common OSINT-safe formats and expand shorteners (e.g., vm.tiktok.com)."""
-	if not link:
-		return link
-	# Convert hxxp/hxxps to http/https
-	link = re.sub(r"^hxxps://", "https://", link, flags=re.IGNORECASE)
-	link = re.sub(r"^hxxp://", "http://", link, flags=re.IGNORECASE)
-	# Add scheme if missing
-	if not re.match(r"^https?://", link, flags=re.IGNORECASE):
-		link = "https://" + link
-	# Try to expand shorteners (vm.tiktok.com and others)
-	try:
-		resp = requests.get(link, allow_redirects=True, timeout=12, headers={"User-Agent": "Mozilla/5.0"})
-		final_url = resp.url or link
-		return final_url
-	except Exception:
-		return link
+def check_link(url: str) -> str:
+    if not VT_API_KEY:
+        return "❌ Ошибка: API-ключ VirusTotal не настроен."
 
+    headers = {
+        "accept": "application/json",
+        "x-apikey": VT_API_KEY
+    }
 
-def scan_link(link: str) -> str:
-	"""Scan a URL with VirusTotal v3 and return a simple verdict summary."""
-	api_key = os.getenv("VIRUSTOTAL_API_KEY", "").strip()
-	if not api_key:
-		return "VirusTotal API key not configured. Add VIRUSTOTAL_API_KEY to .env."
-	# Normalize and expand URL before submitting to VT
-	link = _normalize_url(link)
-	try:
-		resp = requests.post(
-			"https://www.virustotal.com/api/v3/urls",
-			headers={"x-apikey": api_key},
-			data={"url": link},
-			timeout=30,
-		)
-		resp.raise_for_status()
-		url_id = resp.json().get("data", {}).get("id")
-		if not url_id:
-			return "Could not submit URL to VirusTotal."
-		analysis = requests.get(
-			f"https://www.virustotal.com/api/v3/analyses/{url_id}",
-			headers={"x-apikey": api_key},
-			timeout=30,
-		).json()
-		stats = analysis.get("data", {}).get("attributes", {}).get("stats", {})
-		mal = int(stats.get("malicious", 0))
-		susp = int(stats.get("suspicious", 0))
-		und = int(stats.get("undetected", 0))
-		harmless = int(stats.get("harmless", 0))
-		flagged = mal + susp
-		total = max(mal + susp + harmless + und, 1)
-		percent = round((flagged / total) * 100)
-		# Minimal, user-friendly output
-		if mal == 0 and susp == 0:
-			return "Link is safe 😊"
-		elif mal == 0 and susp > 0:
-			return "Link may be risky ⚠️"
-		else:
-			return "Link is NOT safe ❌"
-	except Exception as e:
-		return f"VirusTotal error: {e}"
+    try:
+        # Кодируем URL в base64 без padding (требование VirusTotal API)
+        url_id = base64.urlsafe_b64encode(url.encode()).decode().strip("=")
+        
+        # Запрашиваем отчет
+        response = requests.get(f"{VT_URL}/{url_id}", headers=headers)
+        
+        if response.status_code == 404:
+            return "⚠️ Ссылка еще не проверялась VirusTotal. Попробуйте позже (базе нужно время на анализ)."
+            
+        if response.status_code != 200:
+            return f"❌ Ошибка API VirusTotal: {response.status_code} (Возможно, превышен лимит запросов)."
 
+        data = response.json()
+        attributes = data.get("data", {}).get("attributes", {})
+        
+        stats = attributes.get("last_analysis_stats", {})
+        results = attributes.get("last_analysis_results", {})
+        
+        malicious = stats.get("malicious", 0)
+        suspicious = stats.get("suspicious", 0)
+        harmless = stats.get("harmless", 0)
+        undetected = stats.get("undetected", 0)
+        total = malicious + suspicious + harmless + undetected
 
-def scan_ip(ip: str) -> str:
-	return "IP investigation removed."
+        # Формируем заголовок
+        report = f"🔍 **Анализ VirusTotal для:** `{url}`\n\n"
+        
+        if malicious > 0 or suspicious > 0:
+            report += f"🚨 **Внимание! Обнаружены угрозы:**\n"
+            report += f"🔴 Вредоносных: {malicious}\n"
+            report += f"🟡 Подозрительных: {suspicious}\n\n"
+            report += "**Детали детектов:**\n"
+            
+            # Проходимся по результатам и ищем тех, кто нашел угрозу
+            found_threats = False
+            for vendor, result in results.items():
+                category = result.get("category")
+                if category in ["malicious", "suspicious"]:
+                    threat_name = result.get("result", "Unknown")
+                    report += f"• `{vendor}`: {threat_name}\n"
+                    found_threats = True
+            
+            if not found_threats:
+                report += "• Антивирусы не предоставили названия угроз.\n"
+        else:
+            report += f"✅ **Ссылка безопасна**\n"
+            report += f"🟢 Чисто: {harmless + undetected} из {total} движков.\n"
 
+        # Добавляем категории сайта (если есть)
+        categories = attributes.get("categories", {})
+        if categories:
+            cat_list = list(set(categories.values()))
+            report += f"\n📁 **Категории:** {', '.join(cat_list)}\n"
+
+        return report
+
+    except Exception as e:
+        return f"❌ Ошибка при проверке ссылки: {e}"
