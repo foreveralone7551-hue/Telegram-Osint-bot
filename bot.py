@@ -34,6 +34,7 @@ logging.getLogger('telegram.request').setLevel(logging.WARNING)
 ENV_PATH = Path(__file__).resolve().parent / '.env'
 load_dotenv(dotenv_path=ENV_PATH, override=True)
 
+
 def _normalize(value: str) -> str:
 	if value is None:
 		return value
@@ -62,6 +63,7 @@ if not (_normalize(os.getenv("TELEGRAM_TOKEN")) or _normalize(os.getenv("TELEGRA
 	except Exception:
 		pass
 
+# Resolve token from either env key
 TOKEN = _normalize(os.getenv("TELEGRAM_TOKEN")) or _normalize(os.getenv("TELEGRAM_BOT_TOKEN"))
 
 if not TOKEN:
@@ -70,9 +72,11 @@ if not TOKEN:
 logger.info("Starting application with token present: %s", 'yes')
 application = ApplicationBuilder().token(TOKEN).build()
 
+# Estimated total platforms Blackbird checks (used for progress display)
 TOTAL_PLATFORMS = 754
 
 async def setup_menu():
+	"""Set up the persistent menu and bot commands"""
 	try:
 		await application.bot.delete_my_commands()
 	except Exception:
@@ -158,16 +162,22 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 	user_id = getattr(update.effective_user, 'id', None)
 	logger.info("Button pressed: %s by user_id=%s", query.data, user_id)
 	
-	if query.data in ['username', 'email', 'link']:
+	if query.data in ['username', 'email', 'link', 'phone']:
 		context.user_data['tool'] = query.data
 		tool_names = {
 			'username': 'Username Search',
 			'email': 'Email Scan', 
 			'link': 'Link Analysis',
+			'phone': 'Phone HLR Lookup',
 		}
+		
+		prompt_text = "Send the information you want to investigate:"
+		if query.data == 'phone':
+			prompt_text = "Send the phone number in international format (e.g., +79991234567):"
+			
 		keyboard = [[InlineKeyboardButton("✖ Cancel", callback_data='cancel')]]
 		await query.edit_message_text(
-			f"**{tool_names[query.data]}**\n\nSend the information you want to investigate:",
+			f"**{tool_names[query.data]}**\n\n{prompt_text}",
 			reply_markup=InlineKeyboardMarkup(keyboard)
 		)
 	
@@ -217,6 +227,7 @@ Note: For LEGAL use only. Do not misuse this tool ⚠️"""
 			[InlineKeyboardButton("Username Search", callback_data='username')],
 			[InlineKeyboardButton("Email Scan", callback_data='email')],
 			[InlineKeyboardButton("Link Analysis", callback_data='link')],
+			[InlineKeyboardButton("📞 Phone HLR", callback_data='phone')],
 			[InlineKeyboardButton("Help", callback_data='help')],
 			[InlineKeyboardButton("🧹 Clear Chat", callback_data='clear_chat')]
 		]
@@ -224,7 +235,6 @@ Note: For LEGAL use only. Do not misuse this tool ⚠️"""
 
 application.add_handler(CallbackQueryHandler(button))
 
-# --- НОВАЯ ФУНКЦИЯ ДЛЯ HLR ---
 async def phone_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 	if not context.args:
 		await update.message.reply_text("Usage: `/phone <номер>`\nExample: `/phone +79991234567`", parse_mode='Markdown')
@@ -264,30 +274,34 @@ async def phone_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 	except Exception as e:
 		await update.message.reply_text(f"⚠️ Could not generate PDF: {e}")
 
-# Регистрируем команду /phone
 application.add_handler(CommandHandler("phone", phone_command))
-
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 	tool = context.user_data.get('tool')
 	user = update.effective_user
 	text = (update.message.text if update.message else None) or (update.message.caption if update.message else None)
 	logger.info("Message from user_id=%s tool=%s text=%s", getattr(user, 'id', None), tool, text)
+	
 	if not tool:
 		if update.message:
 			welcome_text = """Hello, welcome! 👋
 
-Tap /start or use the button below to open the menu and begin.
-"""
+Tap /start or use the button below to open the menu and begin."""
 			keyboard = [[InlineKeyboardButton("Start Recon", callback_data='start_menu')]]
-			await update.message.reply_text(
-				welcome_text,
-				reply_markup=InlineKeyboardMarkup(keyboard)
-			)
+			await update.message.reply_text(welcome_text, reply_markup=InlineKeyboardMarkup(keyboard))
 		return
+		
 	msg = text
 	if not msg:
 		return
+		
+	if tool == 'phone':
+		# Если пользователь ввел номер через кнопку
+		await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+		context.args = [msg] # эмулируем аргументы для phone_command
+		await phone_command(update, context)
+		return
+
 	if re.search(r"https?://|www\\.", msg, re.IGNORECASE):
 		context.user_data['tool'] = 'link'
 		tool = 'link'
