@@ -5,7 +5,7 @@ import base64
 VT_API_KEY = os.environ.get("VIRUSTOTAL_API_KEY")
 VT_URL = "https://www.virustotal.com/api/v3/urls"
 
-def check_link(url: str) -> str:
+def scan_link(url: str) -> str:
     if not VT_API_KEY:
         return "❌ Ошибка: API-ключ VirusTotal не настроен."
 
