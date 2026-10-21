@@ -227,7 +227,7 @@ Note: For LEGAL use only. Do not misuse this tool ⚠️"""
 			[InlineKeyboardButton("Username Search", callback_data='username')],
 			[InlineKeyboardButton("Email Scan", callback_data='email')],
 			[InlineKeyboardButton("Link Analysis", callback_data='link')],
-			[InlineKeyboardButton("📞 Phone HLR", callback_data='phone')],
+			[InlineKeyboardButton("Phone HLR", callback_data='phone')],
 			[InlineKeyboardButton("Help", callback_data='help')],
 			[InlineKeyboardButton("🧹 Clear Chat", callback_data='clear_chat')]
 		]
