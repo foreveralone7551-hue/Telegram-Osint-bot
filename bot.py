@@ -11,7 +11,7 @@ import logging
 
 from services import blackbird_service, virustotal_service
 from utils.formatting import format_output
-from services.hlr_phone import lookup_phone
+from phone import lookup_phone
 from utils.pdf_generator import generate_hlr_pdf
 
 # Logging setup (console + file)
