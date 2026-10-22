@@ -316,31 +316,31 @@ def main_menu_keyboard():
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
-                "🔎 Username Search",
+                "Username",
                 callback_data="username",
             ),
             InlineKeyboardButton(
-                "🕵️ Deep Search",
+                "Deep Search",
                 callback_data="maigret",
             ),
         ],
         [
             InlineKeyboardButton(
-                "📧 Email Scan",
+                "Email Scan",
                 callback_data="email",
             ),
             InlineKeyboardButton(
-                "🔗 Link Analysis",
+                "Link Analysis",
                 callback_data="link",
             ),
         ],
         [
             InlineKeyboardButton(
-                "📱 Phone Lookup",
+                "Phone Lookup",
                 callback_data="phone",
             ),
             InlineKeyboardButton(
-                "❓ Help",
+                "Help",
                 callback_data="help",
             ),
         ],
