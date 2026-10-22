@@ -84,7 +84,6 @@ logging.getLogger("telegram.request").setLevel(logging.WARNING)
 # --------------------------------------------------
 
 def remember_message(context, message_id):
-    """Remember message IDs for best-effort cleanup."""
     if not message_id:
         return
 
@@ -97,12 +96,9 @@ def remember_message(context, message_id):
 
 
 async def tracked_reply(message, context, text, **kwargs):
-    """Send a reply and track both the incoming and outgoing messages."""
     remember_message(context, message.message_id)
-
     sent = await message.reply_text(text, **kwargs)
     remember_message(context, sent.message_id)
-
     return sent
 
 
@@ -120,11 +116,10 @@ async def tracked_document(message, context, document, filename, caption=None):
 
 
 async def clear_tracked_chat(query, context):
-    """Delete tracked messages where Telegram permits it."""
     chat = query.message.chat if query.message else None
 
     if not chat:
-        await query.answer("Не удалось определить чат.", show_alert=True)
+        await query.answer("Could not identify the chat.", show_alert=True)
         return
 
     chat_id = chat.id
@@ -133,7 +128,6 @@ async def clear_tracked_chat(query, context):
     if query.message:
         ids.append(query.message.message_id)
 
-    # Answer the callback before deleting the menu message.
     try:
         await query.answer()
     except Exception:
@@ -151,22 +145,19 @@ async def clear_tracked_chat(query, context):
             deleted += 1
         except Exception as exc:
             failed += 1
-            logger.debug(
-                "Could not delete message %s: %s",
-                message_id,
-                exc,
-            )
+            logger.debug("Could not delete message %s: %s", message_id, exc)
 
     context.user_data.pop("tracked_message_ids", None)
 
     sent = await context.bot.send_message(
         chat_id=chat_id,
         text=(
-            "🧹 Очистка завершена.\n"
-            f"Удалено сообщений: {deleted}.\n"
-            f"Не удалось удалить: {failed}.\n\n"
-            "Telegram не позволяет боту гарантированно удалить всю историю. "
-            "Старые сообщения можно удалить средствами самого Telegram."
+            "Chat cleanup completed.\n"
+            f"Messages deleted: {deleted}.\n"
+            f"Messages that could not be deleted: {failed}.\n\n"
+            "Telegram does not allow bots to guarantee deletion of the "
+            "entire chat history. You can delete older messages manually "
+            "in Telegram."
         ),
     )
 
@@ -184,7 +175,6 @@ def safe_filename(value, prefix="Aegis"):
 
 
 def parse_blackbird_results(output):
-    """Convert Blackbird text output into readable report fields."""
     output = str(output or "").strip()
 
     if not output:
@@ -235,7 +225,6 @@ def validate_http_url(value):
         ):
             return None
 
-        # Accessing port validates malformed port syntax.
         _ = parsed.port
 
     except (ValueError, TypeError):
@@ -245,7 +234,6 @@ def validate_http_url(value):
 
 
 def lookup_mx_records(domain):
-    """Retrieve public MX records using DNS-over-HTTPS."""
     try:
         response = requests.get(
             "https://dns.google/resolve",
@@ -281,7 +269,6 @@ def lookup_mx_records(domain):
 
 
 async def send_html_report(message, context, title, data, filename):
-    """Create and send an HTML report as a Telegram document."""
     report_path = await asyncio.to_thread(
         generate_html_report,
         title,
@@ -299,7 +286,7 @@ async def send_html_report(message, context, title, data, filename):
                 context,
                 report_file,
                 filename,
-                caption="🛡️ Aegis Recon | HTML report",
+                caption="Aegis Recon | HTML report",
             )
     finally:
         try:
@@ -309,46 +296,23 @@ async def send_html_report(message, context, title, data, filename):
 
 
 # --------------------------------------------------
-# MENU
+# MENUS
 # --------------------------------------------------
 
 def main_menu_keyboard():
+    # No Delete Chat button in the tools menu.
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton(
-                "Username",
-                callback_data="username",
-            ),
-            InlineKeyboardButton(
-                "Deep Search",
-                callback_data="maigret",
-            ),
+            InlineKeyboardButton("Username", callback_data="username"),
+            InlineKeyboardButton("Deep Search", callback_data="maigret"),
         ],
         [
-            InlineKeyboardButton(
-                "Email Scan",
-                callback_data="email",
-            ),
-            InlineKeyboardButton(
-                "Link Analysis",
-                callback_data="link",
-            ),
+            InlineKeyboardButton("Email Scan", callback_data="email"),
+            InlineKeyboardButton("Link Analysis", callback_data="link"),
         ],
         [
-            InlineKeyboardButton(
-                "Phone Lookup",
-                callback_data="phone",
-            ),
-            InlineKeyboardButton(
-                "Help",
-                callback_data="help",
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                "🧹 Clear Chat",
-                callback_data="clear_chat",
-            ),
+            InlineKeyboardButton("Phone Lookup", callback_data="phone"),
+            InlineKeyboardButton("Help", callback_data="help"),
         ],
     ])
 
@@ -365,25 +329,6 @@ def welcome_text():
         "• Phone Lookup — free local number analysis\n\n"
         "_For lawful and authorized use only._"
     )
-
-
-async def setup_menu():
-    commands = [
-        BotCommand("start", "Open the main menu"),
-        BotCommand("username", "Username Search"),
-        BotCommand("maigret", "Deep Username Search"),
-        BotCommand("email", "Email Scan"),
-        BotCommand("link", "Link Analysis"),
-        BotCommand("phone", "Phone Lookup"),
-        BotCommand("help", "Help and instructions"),
-    ]
-
-    await application.bot.set_my_commands(commands)
-    await application.bot.set_chat_menu_button(
-        menu_button=MenuButtonCommands()
-    )
-
-    logger.info("Bot commands menu configured.")
 
 
 async def post_init(app):
@@ -423,13 +368,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
-                "🚀 Start Recon",
+                "🔍 Start Recon",
                 callback_data="start_menu",
             )
         ],
         [
             InlineKeyboardButton(
-                "🧹 Clear Chat",
+                "🗑 Delete Chat",
                 callback_data="clear_chat",
             )
         ],
@@ -461,7 +406,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        "❓ *Aegis Recon Help*\n\n"
+        "*Aegis Recon Help*\n\n"
         "/start — Main menu\n"
         "/help — Help\n"
         "/username — Username search\n"
@@ -484,39 +429,19 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def ask_tool(update, context, tool, prompt):
     context.user_data["tool"] = tool
     context.user_data["cancel"] = False
-
-    await tracked_reply(
-        update.effective_message,
-        context,
-        prompt,
-    )
+    await tracked_reply(update.effective_message, context, prompt)
 
 
 async def ask_username(update, context):
-    await ask_tool(
-        update,
-        context,
-        "username",
-        "Send the username to search with Blackbird.",
-    )
+    await ask_tool(update, context, "username", "Send the username to search with Blackbird.")
 
 
 async def ask_email(update, context):
-    await ask_tool(
-        update,
-        context,
-        "email",
-        "Send the email address to investigate.",
-    )
+    await ask_tool(update, context, "email", "Send the email address to investigate.")
 
 
 async def ask_link(update, context):
-    await ask_tool(
-        update,
-        context,
-        "link",
-        "Send the URL to analyze with VirusTotal.",
-    )
+    await ask_tool(update, context, "link", "Send the URL to analyze with VirusTotal.")
 
 
 async def ask_phone(update, context):
@@ -557,11 +482,7 @@ async def phone_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    status = await tracked_reply(
-        message,
-        context,
-        "📡 Checking phone information...",
-    )
+    status = await tracked_reply(message, context, "Checking phone information...")
 
     try:
         result = await asyncio.to_thread(lookup_phone, phone)
@@ -576,24 +497,19 @@ async def phone_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await status.edit_text("Phone lookup complete. Preparing HTML report...")
 
-        filename = safe_filename(phone, "Aegis_Phone")
-
         await send_html_report(
             message,
             context,
             f"Phone lookup: {result.get('phone', phone)}",
             {
-                "Service": result.get(
-                    "source",
-                    "Free local number analysis",
-                ),
+                "Service": result.get("source", "Free local number analysis"),
                 **result,
                 "Disclaimer": (
                     "This report does not confirm who owns the number "
                     "or whether a SIM card is active."
                 ),
             },
-            filename,
+            safe_filename(phone, "Aegis_Phone"),
         )
 
         try:
@@ -604,9 +520,7 @@ async def phone_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         logger.exception("Phone lookup failed.")
         try:
-            await status.edit_text(
-                "Phone lookup failed. Check the Render logs."
-            )
+            await status.edit_text("Phone lookup failed. Check the Render logs.")
         except Exception:
             pass
 
@@ -624,17 +538,13 @@ async def maigret_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not username:
         context.user_data["tool"] = "maigret"
-        await tracked_reply(
-            message,
-            context,
-            "Send a username for the deep search.",
-        )
+        await tracked_reply(message, context, "Send a username for the deep search.")
         return
 
     status = await tracked_reply(
         message,
         context,
-        f"🕵️ Running Maigret for {username}. This may take several minutes.",
+        f"Running Maigret for {username}. This may take several minutes.",
     )
 
     try:
@@ -661,11 +571,8 @@ async def maigret_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await status.delete()
             except Exception:
                 pass
-
         else:
-            await status.edit_text(
-                "Maigret did not produce a report. Check Render logs."
-            )
+            await status.edit_text("Maigret did not produce a report. Check Render logs.")
 
     except Exception:
         logger.exception("Maigret search failed.")
@@ -696,21 +603,18 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if query.message:
             try:
                 await query.edit_message_caption(
-                    caption="🛡️ *Aegis Recon — Main Menu*",
-                    parse_mode="Markdown",
+                    caption="Aegis Recon — Main Menu",
                     reply_markup=main_menu_keyboard(),
                 )
             except Exception:
                 try:
                     await query.edit_message_text(
-                        "🛡️ *Aegis Recon — Main Menu*",
-                        parse_mode="Markdown",
+                        "Aegis Recon — Main Menu",
                         reply_markup=main_menu_keyboard(),
                     )
                 except Exception:
                     sent = await query.message.reply_text(
-                        "🛡️ *Aegis Recon — Main Menu*",
-                        parse_mode="Markdown",
+                        "Aegis Recon — Main Menu",
                         reply_markup=main_menu_keyboard(),
                     )
                     remember_message(context, sent.message_id)
@@ -740,19 +644,17 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             remember_message(context, sent.message_id)
         return
 
-    if data == "help":
-        if query.message:
-            sent = await query.message.reply_text(
-                "/username — username search\n"
-                "/maigret — deep search\n"
-                "/email — email scan\n"
-                "/link — URL analysis\n"
-                "/phone — phone lookup\n"
-                "/start — main menu"
-            )
-            remember_message(context, query.message.message_id)
-            remember_message(context, sent.message_id)
-        return
+    if data == "help" and query.message:
+        sent = await query.message.reply_text(
+            "/username — username search\n"
+            "/maigret — deep search\n"
+            "/email — email scan\n"
+            "/link — URL analysis\n"
+            "/phone — phone lookup\n"
+            "/start — main menu"
+        )
+        remember_message(context, query.message.message_id)
+        remember_message(context, sent.message_id)
 
 
 # --------------------------------------------------
@@ -781,21 +683,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("cancel"):
         context.user_data["cancel"] = False
         context.user_data.pop("tool", None)
-
-        await tracked_reply(
-            message,
-            context,
-            "Operation cancelled.",
-        )
+        await tracked_reply(message, context, "Operation cancelled.")
         return
 
     context.user_data.pop("tool", None)
-
-    status = await tracked_reply(
-        message,
-        context,
-        "Scanning... Please wait.",
-    )
+    status = await tracked_reply(message, context, "Scanning... Please wait.")
 
     try:
         await context.bot.send_chat_action(
@@ -803,7 +695,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             action=ChatAction.TYPING,
         )
 
-        # PHONE
         if tool == "phone":
             result = await asyncio.to_thread(lookup_phone, text)
 
@@ -819,14 +710,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 message,
                 context,
                 f"Phone lookup: {result.get('phone', text)}",
-                {
-                    "Service": result.get("source", "Free local analysis"),
-                    **result,
-                },
+                {"Service": result.get("source", "Free local analysis"), **result},
                 safe_filename(text, "Aegis_Phone"),
             )
 
-        # MAIGRET
         elif tool == "maigret":
             username = re.sub(r"\s+", "", text)
 
@@ -851,12 +738,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except OSError:
                     logger.warning("Could not remove Maigret report: %s", report_path)
             else:
-                await status.edit_text(
-                    "Maigret did not produce a report. Check Render logs."
-                )
+                await status.edit_text("Maigret did not produce a report. Check Render logs.")
                 return
 
-        # USERNAME
         elif tool == "username":
             username = re.sub(r"\s+", "", text)
 
@@ -883,7 +767,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 safe_filename(username, "Aegis_Username"),
             )
 
-        # EMAIL
         elif tool == "email":
             if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", text):
                 await status.edit_text("That does not look like a valid email format.")
@@ -896,10 +779,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 blackbird_service.scan_email,
                 email,
             )
-            mx_result = await asyncio.to_thread(
-                lookup_mx_records,
-                domain,
-            )
+            mx_result = await asyncio.to_thread(lookup_mx_records, domain)
 
             report_data = {
                 "Target email": email,
@@ -921,7 +801,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 safe_filename(email, "Aegis_Email"),
             )
 
-        # VIRUSTOTAL
         elif tool == "link":
             url = validate_http_url(text)
 
@@ -929,10 +808,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await status.edit_text("Please send a valid HTTP or HTTPS URL.")
                 return
 
-            result = await asyncio.to_thread(
-                virustotal_service.scan_link,
-                url,
-            )
+            result = await asyncio.to_thread(virustotal_service.scan_link, url)
 
             if isinstance(result, dict):
                 report_data = {
@@ -960,9 +836,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
         else:
-            await status.edit_text(
-                "Unknown tool. Use /start to open the menu."
-            )
+            await status.edit_text("Unknown tool. Use /start to open the menu.")
             return
 
         try:
@@ -972,11 +846,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception:
         logger.exception("Message handling failed for tool=%s", tool)
-
         try:
-            await status.edit_text(
-                "The scan failed. Check Render logs for the error."
-            )
+            await status.edit_text("The scan failed. Check Render logs for the error.")
         except Exception:
             pass
 
@@ -987,12 +858,7 @@ async def handle_other(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     remember_message(context, message.message_id)
-
-    await tracked_reply(
-        message,
-        context,
-        "Please send text or use /start to choose a tool.",
-    )
+    await tracked_reply(message, context, "Please send text or use /start to choose a tool.")
 
 
 # --------------------------------------------------
@@ -1014,10 +880,7 @@ async def chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # --------------------------------------------------
 
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
-    logger.error(
-        "Unhandled Telegram error",
-        exc_info=context.error,
-    )
+    logger.error("Unhandled Telegram error", exc_info=context.error)
 
 
 application = (
@@ -1038,31 +901,19 @@ application.add_handler(CommandHandler("maigret", maigret_command))
 application.add_handler(CallbackQueryHandler(button))
 
 application.add_handler(
-    MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
-        handle_message,
-    )
+    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
 )
 
 application.add_handler(
-    MessageHandler(
-        ~(filters.TEXT | filters.COMMAND),
-        handle_other,
-    )
+    MessageHandler(~(filters.TEXT | filters.COMMAND), handle_other)
 )
 
 application.add_handler(
-    ChatMemberHandler(
-        chat_member_update,
-        ChatMemberHandler.CHAT_MEMBER,
-    )
+    ChatMemberHandler(chat_member_update, ChatMemberHandler.CHAT_MEMBER)
 )
 
 application.add_handler(
-    ChatMemberHandler(
-        chat_member_update,
-        ChatMemberHandler.MY_CHAT_MEMBER,
-    )
+    ChatMemberHandler(chat_member_update, ChatMemberHandler.MY_CHAT_MEMBER)
 )
 
 application.add_error_handler(on_error)
