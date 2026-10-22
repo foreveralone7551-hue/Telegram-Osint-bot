@@ -9,12 +9,13 @@ from telegram.constants import ChatAction
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, ContextTypes, filters, ChatMemberHandler
 import logging
 
+# Импорты сервисов
 from services import blackbird_service, virustotal_service
 from utils.formatting import format_output
 from phone import lookup_phone
-from utils.pdf_generator import generate_hlr_pdf
+from utils.pdf_generator import generate_html_report # Импортируем новый генератор
 
-# Logging setup (console + file)
+# Logging setup
 LOG_PATH = Path(__file__).resolve().parent / 'bot.log'
 logging.basicConfig(
 	level=logging.INFO,
@@ -26,14 +27,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger('bot')
 
-# Reduce verbosity of HTTP libraries to avoid leaking sensitive tokens in URLs
 logging.getLogger('httpx').setLevel(logging.WARNING)
 logging.getLogger('telegram.request').setLevel(logging.WARNING)
 
-# Explicitly load .env from this script's directory
 ENV_PATH = Path(__file__).resolve().parent / '.env'
 load_dotenv(dotenv_path=ENV_PATH, override=True)
-
 
 def _normalize(value: str) -> str:
 	if value is None:
@@ -43,7 +41,6 @@ def _normalize(value: str) -> str:
 		v = v[1:]
 	return v
 
-# Fallback: parse .env manually if needed (supports both keys)
 if not (_normalize(os.getenv("TELEGRAM_TOKEN")) or _normalize(os.getenv("TELEGRAM_BOT_TOKEN"))) and ENV_PATH.exists():
 	try:
 		for raw_line in ENV_PATH.read_text(encoding="utf-8").splitlines():
@@ -63,27 +60,24 @@ if not (_normalize(os.getenv("TELEGRAM_TOKEN")) or _normalize(os.getenv("TELEGRA
 	except Exception:
 		pass
 
-# Resolve token from either env key
 TOKEN = _normalize(os.getenv("TELEGRAM_TOKEN")) or _normalize(os.getenv("TELEGRAM_BOT_TOKEN"))
 
 if not TOKEN:
 	raise RuntimeError(f"Missing bot token. Set TELEGRAM_TOKEN or TELEGRAM_BOT_TOKEN in {ENV_PATH}")
 
-logger.info("Starting application with token present: %s", 'yes')
+logger.info("Starting Aegis Recon with token present: %s", 'yes')
 application = ApplicationBuilder().token(TOKEN).build()
 
-# Estimated total platforms Blackbird checks (used for progress display)
 TOTAL_PLATFORMS = 754
 
 async def setup_menu():
-	"""Set up the persistent menu and bot commands"""
 	try:
 		await application.bot.delete_my_commands()
 	except Exception:
 		pass
 
 	commands = [
-		BotCommand("start", "Start Recon Bot"),
+		BotCommand("start", "Aegis Recon Bot"),
 		BotCommand("username", "Username Search"),
 		BotCommand("email", "Email Scan"),
 		BotCommand("link", "Link Analysis"),
@@ -103,17 +97,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 	user = update.effective_user
 	logger.info("/start from user_id=%s username=%s", getattr(user, 'id', None), getattr(user, 'username', None))
 	
-	welcome_text = """**What can this bot do?**
+	welcome_text = """**🛡️ Aegis Recon**
 
-Hello! Let's Recon it 🚀
+Advanced OSINT Intelligence Toolkit. 🚀
 
-**Available Tools:**
-• Username Search - Find profiles across platforms
-• Email Scan - Analyze email addresses  
-• Link Analysis - Check URLs and domains
-• Phone HLR - Check carrier and validity
+**Available Modules:**
+• **Username Search** - Deep profile discovery
+• **Email Scan** - Breach & data analysis
+• **Link Analysis** - Threat intelligence (VirusTotal)
+• **Phone HLR** - Telecom metadata & carrier info
 
-Note: For LEGAL use only. Do not misuse this tool ⚠️"""
+_Note: For legal and ethical use only. Do not misuse._ ⚠️"""
 	
 	keyboard = [
 		[InlineKeyboardButton("Start Recon", callback_data='start_menu')]
@@ -132,12 +126,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 	user = update.effective_user
 	logger.info("/help from user_id=%s username=%s", getattr(user, 'id', None), getattr(user, 'username', None))
 	
-	help_text = """❓ **Help & Instructions** ❓
+	help_text = """❓ **Aegis Recon Help** ❓
 
 **Available Commands:**
 • `/start` - Start the bot and show main menu
 • `/help` - Show this help message
-• `/phone <номер>` - Check phone number info (HLR)
+• `/phone <number>` - Check phone number info (HLR)
 
 **Available Tools:**
 • **👤 Username Search** - Search for usernames
@@ -211,17 +205,17 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 					pass
 	
 	elif query.data in ['back_to_menu', 'start_menu']:
-		menu_text = """**What can this bot do?**
+		menu_text = """**🛡️ Aegis Recon**
 
-Hello! Let's Recon it 🚀
+Advanced OSINT Intelligence Toolkit. 🚀
 
-**Available Tools:**
-• Username Search - Find profiles across platforms
-• Email Scan - Analyze email addresses  
-• Link Analysis - Check URLs and domains
-• Phone HLR - Check carrier and validity
+**Available Modules:**
+• **Username Search** - Deep profile discovery
+• **Email Scan** - Breach & data analysis
+• **Link Analysis** - Threat intelligence (VirusTotal)
+• **Phone HLR** - Telecom metadata & carrier info
 
-Note: For LEGAL use only. Do not misuse this tool ⚠️"""
+_Note: For legal and ethical use only. Do not misuse._ ⚠️"""
 		
 		keyboard = [
 			[InlineKeyboardButton("Username Search", callback_data='username')],
@@ -237,11 +231,11 @@ application.add_handler(CallbackQueryHandler(button))
 
 async def phone_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 	if not context.args:
-		await update.message.reply_text("Usage: `/phone <номер>`\nExample: `/phone +79991234567`", parse_mode='Markdown')
+		await update.message.reply_text("Usage: `/phone <number>`\nExample: `/phone +79991234567`", parse_mode='Markdown')
 		return
 
 	phone = context.args[0]
-	msg = await update.message.reply_text(f"📡 Checking `{phone}` via HLR...")
+	msg = await update.message.reply_text(f"📡 Checking `{phone}` via HLR (Aegis Recon)...")
 
 	result = lookup_phone(phone)
 
@@ -250,7 +244,8 @@ async def phone_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 		return
 
 	text_report = (
-		f"📞 **HLR Report for {result['phone']}**\n\n"
+		f"🛡️ **Aegis Recon: HLR Report**\n\n"
+		f"**Phone:** {result['phone']}\n"
 		f"**Valid:** {result['valid']}\n"
 		f"**Active:** {result['active']}\n"
 		f"**Carrier:** {result['carrier']}\n"
@@ -263,16 +258,18 @@ async def phone_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 	await msg.edit_text(text_report, parse_mode='Markdown')
 
 	try:
-		pdf_path = generate_hlr_pdf(result, f"hlr_{phone}.pdf")
-		with open(pdf_path, 'rb') as pdf_file:
+		filename = f"Aegis_Report_{result['phone']}.html"
+		html_path = generate_html_report(result['phone'], result, filename)
+		
+		with open(html_path, 'rb') as html_file:
 			await update.message.reply_document(
-				document=pdf_file,
-				filename=f"HLR_{result['phone']}.pdf",
-				caption="📄 Detailed PDF Report"
+				document=html_file,
+				filename=filename,
+				caption="🛡️ Detailed Aegis Recon HTML Report"
 			)
-		os.remove(pdf_path)
+		os.remove(html_path)
 	except Exception as e:
-		await update.message.reply_text(f"⚠️ Could not generate PDF: {e}")
+		await update.message.reply_text(f"⚠️ Could not generate HTML: {e}")
 
 application.add_handler(CommandHandler("phone", phone_command))
 
@@ -284,7 +281,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 	
 	if not tool:
 		if update.message:
-			welcome_text = """Hello, welcome! 👋
+			welcome_text = """Hello, welcome to Aegis Recon! 👋
 
 Tap /start or use the button below to open the menu and begin."""
 			keyboard = [[InlineKeyboardButton("Start Recon", callback_data='start_menu')]]
@@ -296,9 +293,8 @@ Tap /start or use the button below to open the menu and begin."""
 		return
 		
 	if tool == 'phone':
-		# Если пользователь ввел номер через кнопку
 		await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-		context.args = [msg] # эмулируем аргументы для phone_command
+		context.args = [msg]
 		await phone_command(update, context)
 		return
 
@@ -432,6 +428,6 @@ async def post_init(application):
 	await setup_menu()
 
 if __name__ == "__main__":
-	logger.info("Bot starting polling...")
+	logger.info("Aegis Recon starting polling...")
 	application.post_init = post_init
 	application.run_polling()
