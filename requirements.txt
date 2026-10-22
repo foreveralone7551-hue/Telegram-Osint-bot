@@ -10,6 +10,6 @@ faker
 httpx
 aiohttp
 aiohttp_socks
-beautifulsoup4
 lxml
 reportlab
+maigret
