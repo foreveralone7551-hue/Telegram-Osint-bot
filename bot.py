@@ -1,10 +1,14 @@
+
 import os
 import re
 import io
+import json
 import asyncio
 import logging
 from pathlib import Path
+from urllib.parse import urlsplit
 
+import requests
 from dotenv import load_dotenv
 from telegram import (
     InlineKeyboardButton,
@@ -32,12 +36,31 @@ from services.maigret_service import run_maigret
 
 
 # --------------------------------------------------
-# LOGGING
+# CONFIGURATION
 # --------------------------------------------------
 
 BASE_DIR = Path(__file__).resolve().parent
 LOG_PATH = BASE_DIR / "bot.log"
-ENV_PATH = BASE_DIR / ".env"
+
+load_dotenv(BASE_DIR / ".env", override=False)
+
+
+def normalize(value):
+    if not value:
+        return ""
+    return value.strip().strip('"').strip("'").lstrip("\ufeff")
+
+
+TOKEN = (
+    normalize(os.getenv("TELEGRAM_TOKEN"))
+    or normalize(os.getenv("TELEGRAM_BOT_TOKEN"))
+)
+
+if not TOKEN:
+    raise RuntimeError(
+        "Telegram token is missing. Set TELEGRAM_TOKEN "
+        "or TELEGRAM_BOT_TOKEN in Render Environment."
+    )
 
 logging.basicConfig(
     level=logging.INFO,
@@ -52,33 +75,133 @@ logger = logging.getLogger("aegis")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("telegram.request").setLevel(logging.WARNING)
 
-load_dotenv(dotenv_path=ENV_PATH, override=False)
-
-
-def normalize(value):
-    if not value:
-        return ""
-
-    value = value.strip().strip('"').strip("'")
-    return value.lstrip("\ufeff")
-
-
-TOKEN = (
-    normalize(os.getenv("TELEGRAM_TOKEN"))
-    or normalize(os.getenv("TELEGRAM_BOT_TOKEN"))
-)
-
-if not TOKEN:
-    raise RuntimeError(
-        "Telegram token is missing. "
-        "Set TELEGRAM_TOKEN or TELEGRAM_BOT_TOKEN in Render Environment."
-    )
-
-logger.info("Telegram token found.")
-
 application = ApplicationBuilder().token(TOKEN).build()
 
-TOTAL_PLATFORMS = 754
+
+# --------------------------------------------------
+# HTML REPORT HELPERS
+# --------------------------------------------------
+
+def safe_filename(value, prefix="Aegis"):
+    value = re.sub(r"[^a-zA-Z0-9_-]", "_", str(value or "report"))
+    value = value[:70] or "report"
+    return f"{prefix}_{value}.html"
+
+
+def parse_blackbird_results(output):
+    """
+    Convert Blackbird text output into report rows.
+    Keep only data returned by the service; do not invent findings.
+    """
+    output = str(output or "").strip()
+
+    if not output:
+        return {"Status": "No results returned by Blackbird."}
+
+    data = {}
+
+    for index, line in enumerate(output.splitlines(), start=1):
+        line = line.strip()
+        if not line:
+            continue
+
+        match = re.match(
+            r"^(?:🔗\s*)?(.{1,100}?):\s*(https?://\S+)$",
+            line,
+            flags=re.IGNORECASE,
+        )
+
+        if match:
+            site = match.group(1).strip()
+            url = match.group(2).rstrip(".,;)")
+            key = site or f"Result {index}"
+
+            if key in data:
+                key = f"{key} ({index})"
+
+            data[key] = url
+        else:
+            data[f"Result {index}"] = line
+
+    return data or {"Status": "No readable results returned."}
+
+
+def validate_http_url(value):
+    value = str(value or "").strip()
+
+    if not re.match(r"^https?://", value, re.IGNORECASE):
+        value = "https://" + value
+
+    try:
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme.lower() not in ("http", "https")
+            or not parsed.hostname
+            or any(char.isspace() for char in value)
+        ):
+            return None
+    except (ValueError, TypeError):
+        return None
+
+    return value
+
+
+def lookup_mx_records(domain):
+    """Retrieve public MX records using Google's DNS-over-HTTPS endpoint."""
+    try:
+        response = requests.get(
+            "https://dns.google/resolve",
+            params={"name": domain, "type": "MX"},
+            headers={"accept": "application/dns-json"},
+            timeout=12,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        answers = data.get("Answer", [])
+        records = [
+            answer.get("data", "")
+            for answer in answers
+            if answer.get("type") == 15 and answer.get("data")
+        ]
+
+        if records:
+            return "\n".join(records)
+
+        if data.get("Status") == 3:
+            return "Domain does not appear to exist (NXDOMAIN)."
+
+        return "No MX records returned. This alone does not prove the address is invalid."
+
+    except Exception as exc:
+        logger.warning("MX lookup failed for %s: %s", domain, exc)
+        return "MX lookup unavailable."
+
+
+async def send_html_report(message, title, data, filename):
+    """Create and send an HTML report as a Telegram document."""
+    report_path = await asyncio.to_thread(
+        generate_html_report,
+        title,
+        data,
+        filename,
+    )
+
+    if not report_path or not os.path.isfile(report_path):
+        raise RuntimeError("HTML report was not created.")
+
+    try:
+        with open(report_path, "rb") as report_file:
+            await message.reply_document(
+                document=report_file,
+                filename=filename,
+                caption="🛡️ Aegis Recon | HTML report",
+            )
+    finally:
+        try:
+            os.remove(report_path)
+        except OSError:
+            logger.warning("Could not remove report: %s", report_path)
 
 
 # --------------------------------------------------
@@ -100,20 +223,18 @@ def main_menu_keyboard():
 def welcome_text():
     return (
         "**🛡️ Aegis Recon**\n\n"
-        "Advanced OSINT Intelligence Toolkit.\n\n"
-        "**Available Modules:**\n"
+        "OSINT analysis toolkit.\n\n"
+        "**Available modules:**\n"
         "• Username Search — Blackbird\n"
         "• Deep Search — Maigret\n"
-        "• Email Scan\n"
+        "• Email Scan — Blackbird + public MX records\n"
         "• Link Analysis — VirusTotal\n"
-        "• Phone HLR Lookup\n\n"
-        "_For lawful and ethical use only._"
+        "• Phone HLR — IPQualityScore\n\n"
+        "_For lawful and authorized use only._"
     )
 
 
 async def setup_menu(update=None, context=None):
-    bot = application.bot
-
     commands = [
         BotCommand("start", "Open the main menu"),
         BotCommand("username", "Username Search"),
@@ -125,25 +246,19 @@ async def setup_menu(update=None, context=None):
     ]
 
     try:
-        await bot.set_my_commands(commands)
-        await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+        await application.bot.set_my_commands(commands)
+        await application.bot.set_chat_menu_button(
+            menu_button=MenuButtonCommands()
+        )
         logger.info("Bot commands menu configured.")
     except Exception:
         logger.exception("Could not configure bot menu.")
 
     if update and update.effective_message:
-        await update.effective_message.reply_text(
-            "Bot commands configured."
-        )
+        await update.effective_message.reply_text("Bot commands configured.")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    logger.info(
-        "/start from user_id=%s",
-        getattr(user, "id", None),
-    )
-
     if update.effective_message:
         await update.effective_message.reply_text(
             welcome_text(),
@@ -157,42 +272,40 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         "❓ **Aegis Recon Help**\n\n"
-        "**Commands:**\n"
         "/start — Main menu\n"
         "/help — Help\n"
         "/username — Username search\n"
         "/maigret username — Deep username search\n"
         "/email — Email scan\n"
-        "/link — Link analysis\n"
+        "/link — URL analysis\n"
         "/phone number — Phone lookup\n\n"
-        "Choose a tool, send the information, and wait for the result."
+        "Choose a tool, send the target, and wait for the HTML report."
     )
-
-    if update.effective_message:
-        await update.effective_message.reply_text(
-            text,
-            parse_mode="Markdown",
-        )
+    await update.effective_message.reply_text(text, parse_mode="Markdown")
 
 
-async def ask_username(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["tool"] = "username"
-    await update.effective_message.reply_text(
-        "Send the username you want to search."
-    )
+async def ask_tool(update, context, tool, prompt):
+    context.user_data["tool"] = tool
+    context.user_data["cancel"] = False
+    await update.effective_message.reply_text(prompt)
 
 
-async def ask_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["tool"] = "email"
-    await update.effective_message.reply_text(
-        "Send the email address you want to investigate."
-    )
+async def ask_username(update, context):
+    await ask_tool(update, context, "username", "Send the username to search.")
 
 
-async def ask_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["tool"] = "link"
-    await update.effective_message.reply_text(
-        "Send the URL you want to analyze."
+async def ask_email(update, context):
+    await ask_tool(update, context, "email", "Send the email address to investigate.")
+
+
+async def ask_link(update, context):
+    await ask_tool(update, context, "link", "Send the URL to analyze.")
+
+
+async def ask_phone(update, context):
+    await ask_tool(
+        update, context, "phone",
+        "Send the phone number in international format, e.g. +79991234567."
     )
 
 
@@ -202,6 +315,7 @@ application.add_handler(CommandHandler("setup_menu", setup_menu))
 application.add_handler(CommandHandler("username", ask_username))
 application.add_handler(CommandHandler("email", ask_email))
 application.add_handler(CommandHandler("link", ask_link))
+application.add_handler(CommandHandler("phone", ask_phone))
 
 
 # --------------------------------------------------
@@ -211,21 +325,19 @@ application.add_handler(CommandHandler("link", ask_link))
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-
     data = query.data
 
-    if data in ("username", "email", "link", "phone", "maigret"):
+    prompts = {
+        "username": "Send the username to search with Blackbird.",
+        "email": "Send the email address to investigate.",
+        "link": "Send the URL to analyze with VirusTotal.",
+        "phone": "Send the phone number in international format.",
+        "maigret": "Send a username for a deep Maigret search. This may take several minutes.",
+    }
+
+    if data in prompts:
         context.user_data["tool"] = data
         context.user_data["cancel"] = False
-
-        prompts = {
-            "username": "Send the username to search with Blackbird.",
-            "email": "Send the email address to investigate.",
-            "link": "Send the URL to analyze with VirusTotal.",
-            "phone": "Send the phone number in international format.",
-            "maigret": "Send a username for a deep Maigret search. This may take several minutes.",
-        }
-
         await query.edit_message_text(
             f"**{data.title()}**\n\n{prompts[data]}\n\n"
             "Use /start to return to the main menu.",
@@ -241,19 +353,18 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "help":
         await query.edit_message_text(
-            "Use /start to open the menu.\n"
             "/username — username search\n"
             "/maigret username — deep search\n"
             "/email — email scan\n"
             "/link — URL analysis\n"
-            "/phone number — phone lookup"
+            "/phone — phone lookup"
         )
         return
 
     if data == "clear_chat":
         await query.edit_message_text(
-            "I can only delete messages the bot is permitted to delete. "
-            "You can clear the conversation from Telegram."
+            "You can clear the conversation from Telegram. "
+            "The bot cannot remove the entire chat history."
         )
         return
 
@@ -269,23 +380,20 @@ application.add_handler(CallbackQueryHandler(button))
 
 
 # --------------------------------------------------
-# PHONE LOOKUP
+# PHONE HLR
 # --------------------------------------------------
 
 async def phone_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.args:
-        phone = context.args[0]
-    else:
-        phone = context.user_data.get("pending_input")
+    phone = context.args[0] if context.args else None
 
     if not phone:
         context.user_data["tool"] = "phone"
         await update.effective_message.reply_text(
-            "Send a phone number in international format, for example +79991234567."
+            "Send a phone number in international format, e.g. +79991234567."
         )
         return
 
-    msg = await update.effective_message.reply_text(
+    status = await update.effective_message.reply_text(
         "📡 Checking phone information..."
     )
 
@@ -293,58 +401,35 @@ async def phone_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         result = await asyncio.to_thread(lookup_phone, phone)
 
         if not isinstance(result, dict):
-            await msg.edit_text("Lookup failed: unexpected response.")
+            await status.edit_text("Lookup failed: unexpected response.")
             return
 
         if result.get("error"):
-            await msg.edit_text(f"Lookup error: {result['error']}")
+            await status.edit_text(f"Lookup error: {result['error']}")
             return
 
-        report = (
-            "🛡️ **Aegis Recon: HLR Report**\n\n"
-            f"**Phone:** {result.get('phone', phone)}\n"
-            f"**Valid:** {result.get('valid', 'Unknown')}\n"
-            f"**Active:** {result.get('active', 'Unknown')}\n"
-            f"**Carrier:** {result.get('carrier', 'Unknown')}\n"
-            f"**Line Type:** {result.get('line_type', 'Unknown')}\n"
-            f"**Country:** {result.get('country', 'Unknown')}\n"
-            f"**Location:** {result.get('location', 'Unknown')}\n"
-            f"**Fraud Score:** {result.get('fraud_score', 'Unknown')}\n"
-            f"**Risky:** {result.get('risky', 'Unknown')}"
-        )
+        await status.edit_text("Phone lookup complete. Preparing HTML report...")
 
-        await msg.edit_text(report, parse_mode="Markdown")
-
-        filename = f"Aegis_Report_{re.sub(r'[^a-zA-Z0-9_-]', '_', str(phone))}.html"
-        html_path = generate_html_report(
-            str(result.get("phone", phone)),
-            result,
+        filename = safe_filename(phone, "Aegis_Phone")
+        await send_html_report(
+            update.effective_message,
+            f"Phone HLR: {result.get('phone', phone)}",
+            {
+                "Service": "IPQualityScore",
+                **result,
+                "Disclaimer": (
+                    "Fraud score and line status are service estimates, "
+                    "not proof of identity or wrongdoing."
+                ),
+            },
             filename,
         )
 
-        if html_path and os.path.isfile(html_path):
-            with open(html_path, "rb") as file:
-                await update.effective_message.reply_document(
-                    document=file,
-                    filename=filename,
-                    caption="Aegis Recon HTML report",
-                )
-
     except Exception:
         logger.exception("Phone lookup failed.")
-        await update.effective_message.reply_text(
-            "Phone lookup failed. Check the service configuration and logs."
+        await status.edit_text(
+            "Phone lookup failed. Check the IPQualityScore configuration and Render logs."
         )
-
-
-async def phone_from_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    phone = (update.effective_message.text or "").strip()
-    context.user_data.pop("tool", None)
-    context.args = [phone]
-    await phone_command(update, context)
-
-
-application.add_handler(CommandHandler("phone", phone_command))
 
 
 # --------------------------------------------------
@@ -361,7 +446,7 @@ async def maigret_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    msg = await update.effective_message.reply_text(
+    status = await update.effective_message.reply_text(
         f"🕵️ Running Maigret for {username}. This may take several minutes."
     )
 
@@ -369,36 +454,33 @@ async def maigret_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         report_path = await asyncio.to_thread(run_maigret, username)
 
         if report_path and os.path.isfile(report_path):
-            await msg.edit_text("Analysis complete. Sending report...")
-
-            with open(report_path, "rb") as file:
+            await status.edit_text("Analysis complete. Sending report...")
+            with open(report_path, "rb") as report_file:
                 await update.effective_message.reply_document(
-                    document=file,
-                    filename=f"maigret_{username}.html",
+                    document=report_file,
+                    filename=safe_filename(username, "Aegis_Maigret"),
                     caption=f"Aegis Recon report for {username}",
                 )
 
             try:
                 os.remove(report_path)
             except OSError:
-                logger.warning("Could not remove report file: %s", report_path)
+                logger.warning("Could not remove Maigret report: %s", report_path)
         else:
-            await msg.edit_text(
+            await status.edit_text(
                 "Maigret did not produce a report. Check Render logs."
             )
 
     except Exception:
         logger.exception("Maigret search failed.")
-        await msg.edit_text(
-            "Maigret failed. Check Render logs for the error."
-        )
+        await status.edit_text("Maigret failed. Check Render logs.")
 
 
 application.add_handler(CommandHandler("maigret", maigret_command))
 
 
 # --------------------------------------------------
-# MESSAGE HANDLER
+# MAIN MESSAGE HANDLER
 # --------------------------------------------------
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -409,12 +491,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = message.text.strip()
     tool = context.user_data.get("tool")
-
-    logger.info(
-        "Incoming message: user_id=%s tool=%s",
-        getattr(update.effective_user, "id", None),
-        tool,
-    )
 
     if not tool:
         await message.reply_text(
@@ -429,7 +505,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     context.user_data.pop("tool", None)
-
     status = await message.reply_text("Scanning... Please wait.")
 
     try:
@@ -438,90 +513,121 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             action=ChatAction.TYPING,
         )
 
+        # PHONE
         if tool == "phone":
-            context.user_data["pending_input"] = text
             context.args = [text]
             await phone_command(update, context)
-            context.user_data.pop("pending_input", None)
             return
 
+        # MAIGRET
         if tool == "maigret":
             context.args = [text]
             await maigret_command(update, context)
             return
 
+        # USERNAME
         if tool == "username":
             username = re.sub(r"\s+", "", text)
-            result = await asyncio.to_thread(
-                blackbird_service.search_username,
-                username,
-            )
-
-        elif tool == "email":
-            if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", text):
-                await status.edit_text("That does not look like a valid email address.")
+            if not username or len(username) > 100:
+                await status.edit_text("Please send a valid username.")
                 return
 
             result = await asyncio.to_thread(
-                blackbird_service.scan_email,
-                text,
+                blackbird_service.search_username, username
             )
+            report_data = {
+                "Target username": username,
+                "Service": "Blackbird",
+                **parse_blackbird_results(result),
+            }
+            title = f"Username Analysis: {username}"
+            filename = safe_filename(username, "Aegis_Username")
 
+        # EMAIL
+        elif tool == "email":
+            if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", text):
+                await status.edit_text("That does not look like a valid email format.")
+                return
+
+            email = text.strip()
+            domain = email.rsplit("@", 1)[1].lower()
+
+            blackbird_result = await asyncio.to_thread(
+                blackbird_service.scan_email, email
+            )
+            mx_result = await asyncio.to_thread(lookup_mx_records, domain)
+
+            report_data = {
+                "Target email": email,
+                "Format check": "Valid-looking syntax",
+                "Domain": domain,
+                "MX records": mx_result,
+                "Blackbird results": parse_blackbird_results(blackbird_result),
+                "Mailbox existence": (
+                    "Not confirmed. MX records and public search results "
+                    "cannot prove that this mailbox exists or is accessible."
+                ),
+            }
+            title = f"Email Analysis: {email}"
+            filename = safe_filename(email, "Aegis_Email")
+
+        # VIRUSTOTAL
         elif tool == "link":
-            if not re.match(r"^(https?://|www\.)", text, re.IGNORECASE):
-                text = "https://" + text
+            url = validate_http_url(text)
+            if not url:
+                await status.edit_text("Please send a valid HTTP or HTTPS URL.")
+                return
 
             result = await asyncio.to_thread(
-                virustotal_service.scan_link,
-                text,
+                virustotal_service.scan_link, url
             )
+
+            if isinstance(result, dict):
+                report_data = {
+                    "Target URL": url,
+                    "Service": "VirusTotal",
+                    **result,
+                }
+            else:
+                report_data = {
+                    "Target URL": url,
+                    "Service": "VirusTotal",
+                    "Analysis result": str(result or "No results returned."),
+                    "Interpretation": (
+                        "An absence of detections does not guarantee that a URL is safe."
+                    ),
+                }
+
+            title = f"Link Analysis: {url}"
+            filename = safe_filename("link_analysis", "Aegis_VirusTotal")
 
         else:
             await status.edit_text("Unknown tool. Use /start to open the menu.")
             return
 
-        output = result if isinstance(result, str) else str(result or "")
+        await status.edit_text("Scan complete. Generating HTML report...")
 
-        if not output.strip():
-            output = "No results were returned by the service."
+        await send_html_report(
+            message,
+            title,
+            report_data,
+            filename,
+        )
 
         try:
-            formatted = format_output(tool, output)
-            if not isinstance(formatted, str):
-                formatted = str(formatted)
+            await status.delete()
         except Exception:
-            logger.exception("Output formatting failed.")
-            formatted = output
-
-        await status.edit_text("Scan complete. Sending results...")
-
-        if len(formatted) > 3800:
-            buffer = io.BytesIO(output.encode("utf-8"))
-            buffer.name = "results.txt"
-
-            await message.reply_document(
-                document=buffer,
-                caption="Full scan results",
-            )
-        else:
-            try:
-                await message.reply_text(
-                    formatted,
-                    parse_mode="HTML",
-                    disable_web_page_preview=True,
-                )
-            except Exception:
-                await message.reply_text(output[:4000])
+            pass
 
     except Exception:
-        logger.exception("Message handling failed.")
+        logger.exception("Message handling failed for tool=%s", tool)
         try:
             await status.edit_text(
-                "The scan failed. Check Render logs for details."
+                "The scan failed. Check Render logs for the error."
             )
         except Exception:
             await message.reply_text(
-                "The scan failed. Check Render logs for details."
+                "The scan failed. Check Render logs for the error."
             )
 
 
@@ -533,17 +639,10 @@ async def handle_other(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 application.add_handler(
-    MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
-        handle_message,
-    )
+    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
 )
-
 application.add_handler(
-    MessageHandler(
-        ~(filters.TEXT | filters.COMMAND),
-        handle_other,
-    )
+    MessageHandler(~(filters.TEXT | filters.COMMAND), handle_other)
 )
 
 
@@ -553,40 +652,27 @@ application.add_handler(
 
 async def chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
     member_update = update.chat_member or update.my_chat_member
-
-    if not member_update:
-        return
-
-    logger.info(
-        "Chat member status changed in chat_id=%s",
-        member_update.chat.id if member_update.chat else None,
-    )
+    if member_update:
+        logger.info(
+            "Chat member status changed in chat_id=%s",
+            member_update.chat.id if member_update.chat else None,
+        )
 
 
 application.add_handler(
-    ChatMemberHandler(
-        chat_member_update,
-        ChatMemberHandler.CHAT_MEMBER,
-    )
+    ChatMemberHandler(chat_member_update, ChatMemberHandler.CHAT_MEMBER)
 )
-
 application.add_handler(
-    ChatMemberHandler(
-        chat_member_update,
-        ChatMemberHandler.MY_CHAT_MEMBER,
-    )
+    ChatMemberHandler(chat_member_update, ChatMemberHandler.MY_CHAT_MEMBER)
 )
 
 
 # --------------------------------------------------
-# ERROR HANDLING AND STARTUP
+# ERRORS AND STARTUP
 # --------------------------------------------------
 
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
-    logger.error(
-        "Unhandled Telegram error",
-        exc_info=context.error,
-    )
+    logger.error("Unhandled Telegram error", exc_info=context.error)
 
 
 application.add_error_handler(on_error)
