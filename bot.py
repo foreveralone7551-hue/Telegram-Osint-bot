@@ -13,7 +13,8 @@ import logging
 from services import blackbird_service, virustotal_service
 from utils.formatting import format_output
 from phone import lookup_phone
-from utils.pdf_generator import generate_html_report # Импортируем новый генератор
+from utils.pdf_generator import generate_html_report
+from services.maigret_service import run_maigret  # <--- ДОБАВЛЕН ИМПОРТ МАЙГРЕТА
 
 # Logging setup
 LOG_PATH = Path(__file__).resolve().parent / 'bot.log'
@@ -78,7 +79,8 @@ async def setup_menu():
 
 	commands = [
 		BotCommand("start", "Aegis Recon Bot"),
-		BotCommand("username", "Username Search"),
+		BotCommand("username", "Username Search (Blackbird)"),
+		BotCommand("maigret", "Deep Username Search (Maigret)"),
 		BotCommand("email", "Email Scan"),
 		BotCommand("link", "Link Analysis"),
 		BotCommand("phone", "Phone HLR Lookup"),
@@ -102,7 +104,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 Advanced OSINT Intelligence Toolkit. 🚀
 
 **Available Modules:**
-• **Username Search** - Deep profile discovery
+• **Username Search** - Fast scan (Blackbird)
+• **Deep Search** - Deep scan (Maigret, 3000+ sites)
 • **Email Scan** - Breach & data analysis
 • **Link Analysis** - Threat intelligence (VirusTotal)
 • **Phone HLR** - Telecom metadata & carrier info
@@ -118,9 +121,9 @@ _Note: For legal and ethical use only. Do not misuse._ ⚠️"""
 
 application.add_handler(CommandHandler("start", start))
 
-application.add_handler(CommandHandler("username", lambda u, c: c.bot.send_message(chat_id=u.effective_chat.id, text="**Username Search**\n\nSend the information you want to investigate:", parse_mode="Markdown")))
-application.add_handler(CommandHandler("email", lambda u, c: c.bot.send_message(chat_id=u.effective_chat.id, text="**Email Scan**\n\nSend the information you want to investigate:", parse_mode="Markdown")))
-application.add_handler(CommandHandler("link", lambda u, c: c.bot.send_message(chat_id=u.effective_chat.id, text="**Link Analysis**\n\nSend the information you want to investigate:", parse_mode="Markdown")))
+application.add_handler(CommandHandler("username", lambda u, c: c.bot.send_message(chat_id=u.effective_chat.id, text="**Username Search**\n\nSend the username you want to investigate:", parse_mode="Markdown")))
+application.add_handler(CommandHandler("email", lambda u, c: c.bot.send_message(chat_id=u.effective_chat.id, text="**Email Scan**\n\nSend the email you want to investigate:", parse_mode="Markdown")))
+application.add_handler(CommandHandler("link", lambda u, c: c.bot.send_message(chat_id=u.effective_chat.id, text="**Link Analysis**\n\nSend the URL you want to investigate:", parse_mode="Markdown")))
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 	user = update.effective_user
@@ -131,10 +134,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 **Available Commands:**
 • `/start` - Start the bot and show main menu
 • `/help` - Show this help message
+• `/maigret <username>` - Deep username search (slow)
 • `/phone <number>` - Check phone number info (HLR)
 
 **Available Tools:**
-• **👤 Username Search** - Search for usernames
+• **👤 Username Search** - Search for usernames (Blackbird)
+• **🔎 Deep Search** - Search across 3000+ sites (Maigret)
 • **📧 Email Scan** - Analyze email addresses
 • **🔗 Link Analysis** - Check URLs for safety
 • **📞 Phone HLR** - Validate phone numbers
@@ -142,7 +147,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 **How to Use:**
 1. Choose a tool from the menu
 2. Send the information you want to investigate
-3. Wait for results (may take up to 1 minute)"""
+3. Wait for results (Maigret can take up to 10 minutes)"""
 	
 	if update.message:
 		await update.message.reply_text(help_text, parse_mode="Markdown")
@@ -156,10 +161,11 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 	user_id = getattr(update.effective_user, 'id', None)
 	logger.info("Button pressed: %s by user_id=%s", query.data, user_id)
 	
-	if query.data in ['username', 'email', 'link', 'phone']:
+	if query.data in ['username', 'email', 'link', 'phone', 'maigret']:
 		context.user_data['tool'] = query.data
 		tool_names = {
-			'username': 'Username Search',
+			'username': 'Username Search (Blackbird)',
+			'maigret': 'Deep Search (Maigret)',
 			'email': 'Email Scan', 
 			'link': 'Link Analysis',
 			'phone': 'Phone HLR Lookup',
@@ -168,6 +174,8 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 		prompt_text = "Send the information you want to investigate:"
 		if query.data == 'phone':
 			prompt_text = "Send the phone number in international format (e.g., +79991234567):"
+		elif query.data == 'maigret':
+			prompt_text = "Send the username. ⚠️ This may take 5-10 minutes on free tier."
 			
 		keyboard = [[InlineKeyboardButton("✖ Cancel", callback_data='cancel')]]
 		await query.edit_message_text(
@@ -210,7 +218,8 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 Advanced OSINT Intelligence Toolkit. 🚀
 
 **Available Modules:**
-• **Username Search** - Deep profile discovery
+• **Username Search** - Fast scan (Blackbird)
+• **Deep Search** - Deep scan (Maigret, 3000+ sites)
 • **Email Scan** - Breach & data analysis
 • **Link Analysis** - Threat intelligence (VirusTotal)
 • **Phone HLR** - Telecom metadata & carrier info
@@ -219,6 +228,7 @@ _Note: For legal and ethical use only. Do not misuse._ ⚠️"""
 		
 		keyboard = [
 			[InlineKeyboardButton("Username Search", callback_data='username')],
+			[InlineKeyboardButton("Deep Search (Maigret)", callback_data='maigret')],
 			[InlineKeyboardButton("Email Scan", callback_data='email')],
 			[InlineKeyboardButton("Link Analysis", callback_data='link')],
 			[InlineKeyboardButton("Phone HLR", callback_data='phone')],
@@ -273,6 +283,30 @@ async def phone_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 application.add_handler(CommandHandler("phone", phone_command))
 
+async def maigret_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+	if not context.args:
+		await update.message.reply_text("Usage: `/maigret <username>`", parse_mode='Markdown')
+		return
+
+	username = context.args[0]
+	msg = await update.message.reply_text(f"🕵️ Running Deep Search (Maigret) for `{username}`... This may take 5-10 minutes.")
+
+	report_path = await asyncio.to_thread(run_maigret, username)
+
+	if report_path and os.path.exists(report_path):
+		await msg.edit_text("✅ Analysis complete. Sending HTML report...")
+		with open(report_path, 'rb') as f:
+			await update.message.reply_document(
+				document=f,
+				filename=f"maigret_{username}.html",
+				caption=f"🛡️ Aegis Recon: Maigret Report for {username}"
+			)
+		os.remove(report_path)
+	else:
+		await msg.edit_text(f"❌ No results or error for `{username}`.")
+
+application.add_handler(CommandHandler("maigret", maigret_command))
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 	tool = context.user_data.get('tool')
 	user = update.effective_user
@@ -297,42 +331,47 @@ Tap /start or use the button below to open the menu and begin."""
 		context.args = [msg]
 		await phone_command(update, context)
 		return
+	elif tool == 'maigret':
+		await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+		context.args = [msg]
+		await maigret_command(update, context)
+		return
 
 	if re.search(r"https?://|www\\.", msg, re.IGNORECASE):
 		context.user_data['tool'] = 'link'
 		tool = 'link'
-	elif re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", msg, re.IGNORECASE):
+	elif re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", msg, re.IGN ==ORECASE):
 		context.user_data['tool'] = 'email'
-		tool = 'email'
-	context.user_data['cancel'] = False
+		tool = ' 'email'
+	context.user_data['cancelemail'] = False
 	try:
-		status_text = f"Scanning {tool}… This may take up to 3 minutes."
+		status_text = f':
+"Scanning {tool}… This may take up		 to 3 minutes."
 		status_msg = None
 		if update.message:
-			status_msg = await update.message.reply_text(status_text)
-			await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+			status_msg = await	 update.message.reply_text(status_text)
+			await context.bot.sendprocessed_chat_action(chat_id=update.effective_chat =.id, action=ChatAction.TYPING)
 
-		if tool == 'username':
-			search_name = re.sub(r"\s+", "", msg)
+		if  tool == 'username':
+			search0_name = re.sub(r"\s+", "", msg
+)
 			processed = 0
 			try:
-				async for _ in blackbird_service.stream_username(search_name):
+						async for _ in blackbird_service.stream_username(search_name):
 					if context.user_data.get('cancel'):
 						break
 					processed += 1
 					if processed % 10 == 0 and status_msg:
-						percent = 100 if processed >= TOTAL_PLATFORMS else int(processed * 100 / TOTAL_PLATFORMS)
+						percent = 100 if processed >= TOTAL	try_PLATFORMS else int(processed * 100 /:
+ TOTAL_PLATFORMS)
 						try:
-							await status_msg.edit_text(f"🔍 **Username Search Progress**\n\n{percent}% ({min(processed, TOTAL_PLATFORMS)}/{TOTAL_PLATFORMS})")
-						except Exception:
+										await status_msg.edit_text(f"🔍 **Username Search Progress**\	n\n{percent}% ({min(processed,async TOTAL_PLATFORMS)}/{T forOTAL_PLATFORMS})")
+						except _ Exception:
 							pass
-			except Exception as e:
-				logger.warning("Error in streaming: %s", e)
-			result = "Cancelled." if context.user_data.get('cancel') else await asyncio.to_thread(blackbird_service.search_username, search_name)
-		elif tool == 'email':
-			processed = 0
-			try:
-				async for _ in blackbird_service.stream_email(msg):
+			except Exception as in e:
+				logger.warning("Error in streaming: black %s", ebird_service)
+			result = ".streamCancelled." if context.user_data.get('cancel')_email else await asyncio.to_thread(blackbird_service.search_(msgusername, search_name)
+		elif tool):
 					if context.user_data.get('cancel'):
 						break
 					processed += 1
