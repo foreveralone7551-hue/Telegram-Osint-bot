@@ -342,7 +342,7 @@ Tap /start or use the button below to open the menu and begin."""
 		tool = 'link'
 	elif re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", msg, re.IGN ==ORECASE):
 		context.user_data['tool'] = 'email'
-		tool = ' 'email'
+		tool = 'email'
 	context.user_data['cancelemail'] = False
 	try:
 		status_text = f':
