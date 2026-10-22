@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import re
 import asyncio
@@ -81,38 +82,38 @@ logging.getLogger("telegram.request").setLevel(logging.WARNING)
 # --------------------------------------------------
 
 LANGUAGES = {
-    "en": {"flag": "ðºð¸", "name": "English"},
-    "ru": {"flag": "ð·ðº", "name": "Ð ÑÑÑÐºÐ¸Ð¹"},
-    "pl": {"flag": "ðµð±", "name": "Polski"},
+    "en": {"flag": "🇺🇸", "name": "English"},
+    "ru": {"flag": "🇷🇺", "name": "Русский"},
+    "pl": {"flag": "🇵🇱", "name": "Polski"},
 }
 
 TEXT = {
     "en": {
-        "language_button": "ðºð¸ Language",
-        "start_button": "ð Start Recon",
-        "delete_button": "ð Delete Chat",
+        "language_button": "🇺🇸 Language",
+        "start_button": "🔍 Start Recon",
+        "delete_button": "🗑 Delete Chat",
         "welcome": (
-            "ð¡ï¸ *Aegis Recon*\n\n"
+            "🛡️ *Aegis Recon*\n\n"
             "OSINT analysis toolkit.\n\n"
             "*Available modules:*\n"
-            "â¢ Username Search â Blackbird\n"
-            "â¢ Deep Search â Maigret\n"
-            "â¢ Email Scan â Blackbird + public MX records\n"
-            "â¢ Link Analysis â VirusTotal\n"
-            "â¢ Phone Lookup â free local number analysis\n\n"
+            "• Username Search — Blackbird\n"
+            "• Deep Search — Maigret\n"
+            "• Email Scan — Blackbird + public MX records\n"
+            "• Link Analysis — VirusTotal\n"
+            "• Phone Lookup — free local number analysis\n\n"
             "_For lawful and authorized use only._"
         ),
-        "main_menu": "Aegis Recon â Main Menu",
+        "main_menu": "Aegis Recon — Main Menu",
         "username": "Username",
         "maigret": "Deep Search",
         "email": "Email Scan",
         "link": "Link Analysis",
         "phone": "Phone Lookup",
         "help": "Help",
-        "language_title": "ð Choose your language:",
-        "back": "â¬ï¸ Back",
-        "language_changed": "Language changed to English ðºð¸",
-        "language_current": "Current language: English ðºð¸",
+        "language_title": "🌐 Choose your language:",
+        "back": "⬅️ Back",
+        "language_changed": "Language changed to English 🇺🇸",
+        "language_current": "Current language: English 🇺🇸",
         "cleanup_no_chat": "Could not identify the chat.",
         "cleanup_done": (
             "Chat cleanup completed.\n"
@@ -123,13 +124,13 @@ TEXT = {
         ),
         "help_text": (
             "*Aegis Recon Help*\n\n"
-            "/start â Main menu\n"
-            "/help â Help\n"
-            "/username â Username search\n"
-            "/maigret username â Deep username search\n"
-            "/email â Email scan\n"
-            "/link â URL analysis\n"
-            "/phone â Phone lookup\n\n"
+            "/start — Main menu\n"
+            "/help — Help\n"
+            "/username — Username search\n"
+            "/maigret username — Deep username search\n"
+            "/email — Email scan\n"
+            "/link — URL analysis\n"
+            "/phone — Phone lookup\n\n"
             "Choose a tool, send the target, and wait for the HTML report.\n\n"
             "Use only services and data you are authorized to investigate."
         ),
@@ -166,186 +167,186 @@ TEXT = {
         "report_user": "Aegis Recon report for {username}",
         "prompt_header": "{tool}\n\n{prompt}\n\nUse /start to open the main menu.",
         "help_short": (
-            "/username â username search\n"
-            "/maigret â deep search\n"
-            "/email â email scan\n"
-            "/link â URL analysis\n"
-            "/phone â phone lookup\n"
-            "/start â main menu"
+            "/username — username search\n"
+            "/maigret — deep search\n"
+            "/email — email scan\n"
+            "/link — URL analysis\n"
+            "/phone — phone lookup\n"
+            "/start — main menu"
         ),
     },
     "ru": {
-        "language_button": "ð·ðº Ð¯Ð·ÑÐº",
-        "start_button": "ð ÐÐ°ÑÐ°ÑÑ ÑÐ°Ð·Ð²ÐµÐ´ÐºÑ",
-        "delete_button": "ð ÐÑÐ¸ÑÑÐ¸ÑÑ ÑÐ°Ñ",
+        "language_button": "🇷🇺 Язык",
+        "start_button": "🔍 Начать разведку",
+        "delete_button": "🗑 Очистить чат",
         "welcome": (
-            "ð¡ï¸ *Aegis Recon*\n\n"
-            "ÐÐ½ÑÑÑÑÐ¼ÐµÐ½ÑÑ OSINT-Ð°Ð½Ð°Ð»Ð¸Ð·Ð°.\n\n"
-            "*ÐÐ¾ÑÑÑÐ¿Ð½ÑÐµ Ð¼Ð¾Ð´ÑÐ»Ð¸:*\n"
-            "â¢ ÐÐ¾Ð¸ÑÐº Ð¸Ð¼ÐµÐ½Ð¸ Ð¿Ð¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ â Blackbird\n"
-            "â¢ ÐÐ»ÑÐ±Ð¾ÐºÐ¸Ð¹ Ð¿Ð¾Ð¸ÑÐº â Maigret\n"
-            "â¢ ÐÑÐ¾Ð²ÐµÑÐºÐ° Ð¿Ð¾ÑÑÑ â Blackbird + Ð¿ÑÐ±Ð»Ð¸ÑÐ½ÑÐµ MX-Ð·Ð°Ð¿Ð¸ÑÐ¸\n"
-            "â¢ ÐÐ½Ð°Ð»Ð¸Ð· ÑÑÑÐ»Ð¾Ðº â VirusTotal\n"
-            "â¢ ÐÑÐ¾Ð²ÐµÑÐºÐ° Ð½Ð¾Ð¼ÐµÑÐ° â Ð»Ð¾ÐºÐ°Ð»ÑÐ½ÑÐ¹ Ð±ÐµÑÐ¿Ð»Ð°ÑÐ½ÑÐ¹ Ð°Ð½Ð°Ð»Ð¸Ð·\n\n"
-            "_ÐÑÐ¿Ð¾Ð»ÑÐ·ÑÐ¹ÑÐµ ÑÐµÑÐ²Ð¸Ñ ÑÐ¾Ð»ÑÐºÐ¾ Ð·Ð°ÐºÐ¾Ð½Ð½Ð¾ Ð¸ Ñ ÑÐ°Ð·ÑÐµÑÐµÐ½Ð¸Ñ._"
+            "🛡️ *Aegis Recon*\n\n"
+            "Инструменты OSINT-анализа.\n\n"
+            "*Доступные модули:*\n"
+            "• Поиск имени пользователя — Blackbird\n"
+            "• Глубокий поиск — Maigret\n"
+            "• Проверка почты — Blackbird + публичные MX-записи\n"
+            "• Анализ ссылок — VirusTotal\n"
+            "• Проверка номера — локальный бесплатный анализ\n\n"
+            "_Используйте сервис только законно и с разрешения._"
         ),
-        "main_menu": "Aegis Recon â ÐÐ»Ð°Ð²Ð½Ð¾Ðµ Ð¼ÐµÐ½Ñ",
-        "username": "ÐÐ¾Ð¸ÑÐº Ð¸Ð¼ÐµÐ½Ð¸",
-        "maigret": "ÐÐ»ÑÐ±Ð¾ÐºÐ¸Ð¹ Ð¿Ð¾Ð¸ÑÐº",
-        "email": "ÐÑÐ¾Ð²ÐµÑÐºÐ° Ð¿Ð¾ÑÑÑ",
-        "link": "ÐÐ½Ð°Ð»Ð¸Ð· ÑÑÑÐ»ÐºÐ¸",
-        "phone": "ÐÑÐ¾Ð²ÐµÑÐºÐ° Ð½Ð¾Ð¼ÐµÑÐ°",
-        "help": "ÐÐ¾Ð¼Ð¾ÑÑ",
-        "language_title": "ð ÐÑÐ±ÐµÑÐ¸ÑÐµ ÑÐ·ÑÐº:",
-        "back": "â¬ï¸ ÐÐ°Ð·Ð°Ð´",
-        "language_changed": "Ð¯Ð·ÑÐº Ð¸Ð·Ð¼ÐµÐ½ÑÐ½ Ð½Ð° ÑÑÑÑÐºÐ¸Ð¹ ð·ðº",
-        "language_current": "Ð¢ÐµÐºÑÑÐ¸Ð¹ ÑÐ·ÑÐº: ÑÑÑÑÐºÐ¸Ð¹ ð·ðº",
-        "cleanup_no_chat": "ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¾Ð¿ÑÐµÐ´ÐµÐ»Ð¸ÑÑ ÑÐ°Ñ.",
+        "main_menu": "Aegis Recon — Главное меню",
+        "username": "Поиск имени",
+        "maigret": "Глубокий поиск",
+        "email": "Проверка почты",
+        "link": "Анализ ссылки",
+        "phone": "Проверка номера",
+        "help": "Помощь",
+        "language_title": "🌐 Выберите язык:",
+        "back": "⬅️ Назад",
+        "language_changed": "Язык изменён на русский 🇷🇺",
+        "language_current": "Текущий язык: русский 🇷🇺",
+        "cleanup_no_chat": "Не удалось определить чат.",
         "cleanup_done": (
-            "ÐÑÐ¸ÑÑÐºÐ° ÑÐ°ÑÐ° Ð·Ð°Ð²ÐµÑÑÐµÐ½Ð°.\n"
-            "Ð£Ð´Ð°Ð»ÐµÐ½Ð¾ ÑÐ¾Ð¾Ð±ÑÐµÐ½Ð¸Ð¹: {deleted}.\n"
-            "ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ ÑÐ´Ð°Ð»Ð¸ÑÑ: {failed}.\n\n"
-            "Telegram Ð½Ðµ Ð¿Ð¾Ð·Ð²Ð¾Ð»ÑÐµÑ Ð±Ð¾ÑÑ Ð³Ð°ÑÐ°Ð½ÑÐ¸ÑÐ¾Ð²Ð°Ð½Ð½Ð¾ ÑÐ´Ð°Ð»Ð¸ÑÑ Ð²ÑÑ Ð¸ÑÑÐ¾ÑÐ¸Ñ. "
-            "Ð¡ÑÐ°ÑÑÐµ ÑÐ¾Ð¾Ð±ÑÐµÐ½Ð¸Ñ Ð¼Ð¾Ð¶Ð½Ð¾ ÑÐ´Ð°Ð»Ð¸ÑÑ Ð²ÑÑÑÐ½ÑÑ Ð² Telegram."
+            "Очистка чата завершена.\n"
+            "Удалено сообщений: {deleted}.\n"
+            "Не удалось удалить: {failed}.\n\n"
+            "Telegram не позволяет боту гарантированно удалить всю историю. "
+            "Старые сообщения можно удалить вручную в Telegram."
         ),
         "help_text": (
-            "*Ð¡Ð¿ÑÐ°Ð²ÐºÐ° Aegis Recon*\n\n"
-            "/start â Ð³Ð»Ð°Ð²Ð½Ð¾Ðµ Ð¼ÐµÐ½Ñ\n"
-            "/help â Ð¿Ð¾Ð¼Ð¾ÑÑ\n"
-            "/username â Ð¿Ð¾Ð¸ÑÐº Ð¸Ð¼ÐµÐ½Ð¸ Ð¿Ð¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ\n"
-            "/maigret username â Ð³Ð»ÑÐ±Ð¾ÐºÐ¸Ð¹ Ð¿Ð¾Ð¸ÑÐº\n"
-            "/email â Ð¿ÑÐ¾Ð²ÐµÑÐºÐ° Ð¿Ð¾ÑÑÑ\n"
-            "/link â Ð°Ð½Ð°Ð»Ð¸Ð· ÑÑÑÐ»ÐºÐ¸\n"
-            "/phone â Ð¿ÑÐ¾Ð²ÐµÑÐºÐ° Ð½Ð¾Ð¼ÐµÑÐ°\n\n"
-            "ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð¸Ð½ÑÑÑÑÐ¼ÐµÐ½Ñ, Ð¾ÑÐ¿ÑÐ°Ð²ÑÑÐµ ÑÐµÐ»Ñ Ð¸ Ð´Ð¾Ð¶Ð´Ð¸ÑÐµÑÑ HTML-Ð¾ÑÑÑÑÐ°.\n\n"
-            "ÐÑÐ¿Ð¾Ð»ÑÐ·ÑÐ¹ÑÐµ ÑÐ¾Ð»ÑÐºÐ¾ ÑÐµ Ð´Ð°Ð½Ð½ÑÐµ Ð¸ ÑÐµÑÐ²Ð¸ÑÑ, Ðº ÐºÐ¾ÑÐ¾ÑÑÐ¼ Ñ Ð²Ð°Ñ ÐµÑÑÑ Ð·Ð°ÐºÐ¾Ð½Ð½ÑÐ¹ Ð´Ð¾ÑÑÑÐ¿."
+            "*Справка Aegis Recon*\n\n"
+            "/start — главное меню\n"
+            "/help — помощь\n"
+            "/username — поиск имени пользователя\n"
+            "/maigret username — глубокий поиск\n"
+            "/email — проверка почты\n"
+            "/link — анализ ссылки\n"
+            "/phone — проверка номера\n\n"
+            "Выберите инструмент, отправьте цель и дождитесь HTML-отчёта.\n\n"
+            "Используйте только те данные и сервисы, к которым у вас есть законный доступ."
         ),
-        "ask_username": "ÐÑÐ¿ÑÐ°Ð²ÑÑÐµ Ð¸Ð¼Ñ Ð¿Ð¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ Ð´Ð»Ñ Ð¿Ð¾Ð¸ÑÐºÐ° ÑÐµÑÐµÐ· Blackbird.",
-        "ask_email": "ÐÑÐ¿ÑÐ°Ð²ÑÑÐµ Ð°Ð´ÑÐµÑ ÑÐ»ÐµÐºÑÑÐ¾Ð½Ð½Ð¾Ð¹ Ð¿Ð¾ÑÑÑ Ð´Ð»Ñ Ð¿ÑÐ¾Ð²ÐµÑÐºÐ¸.",
-        "ask_link": "ÐÑÐ¿ÑÐ°Ð²ÑÑÐµ ÑÑÑÐ»ÐºÑ Ð´Ð»Ñ Ð°Ð½Ð°Ð»Ð¸Ð·Ð° ÑÐµÑÐµÐ· VirusTotal.",
-        "ask_phone": "ÐÑÐ¿ÑÐ°Ð²ÑÑÐµ Ð½Ð¾Ð¼ÐµÑ Ð² Ð¼ÐµÐ¶Ð´ÑÐ½Ð°ÑÐ¾Ð´Ð½Ð¾Ð¼ ÑÐ¾ÑÐ¼Ð°ÑÐµ, Ð½Ð°Ð¿ÑÐ¸Ð¼ÐµÑ +79991234567.",
-        "ask_maigret": "ÐÑÐ¿ÑÐ°Ð²ÑÑÐµ Ð¸Ð¼Ñ Ð¿Ð¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ Ð´Ð»Ñ Ð³Ð»ÑÐ±Ð¾ÐºÐ¾Ð³Ð¾ Ð¿Ð¾Ð¸ÑÐºÐ° Maigret. Ð­ÑÐ¾ Ð¼Ð¾Ð¶ÐµÑ Ð·Ð°Ð½ÑÑÑ Ð½ÐµÑÐºÐ¾Ð»ÑÐºÐ¾ Ð¼Ð¸Ð½ÑÑ.",
-        "welcome_no_tool": "ÐÐ¾Ð±ÑÐ¾ Ð¿Ð¾Ð¶Ð°Ð»Ð¾Ð²Ð°ÑÑ Ð² Aegis Recon. ÐÑÐ¿Ð¾Ð»ÑÐ·ÑÐ¹ÑÐµ /start, ÑÑÐ¾Ð±Ñ Ð²ÑÐ±ÑÐ°ÑÑ Ð¸Ð½ÑÑÑÑÐ¼ÐµÐ½Ñ.",
-        "cancelled": "ÐÐ¿ÐµÑÐ°ÑÐ¸Ñ Ð¾ÑÐ¼ÐµÐ½ÐµÐ½Ð°.",
-        "scanning": "ÐÑÐ¿Ð¾Ð»Ð½ÑÐµÑÑÑ Ð¿ÑÐ¾Ð²ÐµÑÐºÐ°... ÐÐ¾Ð´Ð¾Ð¶Ð´Ð¸ÑÐµ.",
-        "unexpected": "ÐÑÐ¸Ð±ÐºÐ° Ð¿ÑÐ¾Ð²ÐµÑÐºÐ¸: Ð¿Ð¾Ð»ÑÑÐµÐ½ Ð½ÐµÐ¾Ð¶Ð¸Ð´Ð°Ð½Ð½ÑÐ¹ Ð¾ÑÐ²ÐµÑ.",
-        "valid_phone": "ÐÑÐ¿ÑÐ°Ð²ÑÑÐµ Ð½Ð¾Ð¼ÐµÑ Ð² Ð¼ÐµÐ¶Ð´ÑÐ½Ð°ÑÐ¾Ð´Ð½Ð¾Ð¼ ÑÐ¾ÑÐ¼Ð°ÑÐµ, Ð½Ð°Ð¿ÑÐ¸Ð¼ÐµÑ +79991234567.",
-        "phone_checking": "ÐÑÐ¾Ð²ÐµÑÑÑ Ð¸Ð½ÑÐ¾ÑÐ¼Ð°ÑÐ¸Ñ Ð¾ Ð½Ð¾Ð¼ÐµÑÐµ...",
-        "phone_error": "ÐÑÐ¸Ð±ÐºÐ° Ð¿ÑÐ¾Ð²ÐµÑÐºÐ¸: {error}",
-        "phone_complete": "ÐÑÐ¾Ð²ÐµÑÐºÐ° Ð½Ð¾Ð¼ÐµÑÐ° Ð·Ð°Ð²ÐµÑÑÐµÐ½Ð°. ÐÐ¾ÑÐ¾Ð²Ð»Ñ HTML-Ð¾ÑÑÑÑ...",
-        "phone_failed": "ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¿ÑÐ¾Ð²ÐµÑÐ¸ÑÑ Ð½Ð¾Ð¼ÐµÑ. ÐÑÐ¾Ð²ÐµÑÑÑÐµ Ð»Ð¾Ð³Ð¸ Render.",
-        "maigret_running": "ÐÐ°Ð¿ÑÑÐºÐ°Ñ Maigret Ð´Ð»Ñ {username}. Ð­ÑÐ¾ Ð¼Ð¾Ð¶ÐµÑ Ð·Ð°Ð½ÑÑÑ Ð½ÐµÑÐºÐ¾Ð»ÑÐºÐ¾ Ð¼Ð¸Ð½ÑÑ.",
-        "report_sending": "ÐÐ½Ð°Ð»Ð¸Ð· Ð·Ð°Ð²ÐµÑÑÑÐ½. ÐÑÐ¿ÑÐ°Ð²Ð»ÑÑ Ð¾ÑÑÑÑ...",
-        "maigret_no_report": "Maigret Ð½Ðµ ÑÐ¾Ð·Ð´Ð°Ð» Ð¾ÑÑÑÑ. ÐÑÐ¾Ð²ÐµÑÑÑÐµ Ð»Ð¾Ð³Ð¸ Render.",
-        "maigret_failed": "ÐÑÐ¸Ð±ÐºÐ° Maigret. ÐÑÐ¾Ð²ÐµÑÑÑÐµ Ð»Ð¾Ð³Ð¸ Render.",
-        "tool_title_username": "ÐÐ¾Ð¸ÑÐº Ð¸Ð¼ÐµÐ½Ð¸",
-        "tool_title_email": "ÐÑÐ¾Ð²ÐµÑÐºÐ° Ð¿Ð¾ÑÑÑ",
-        "tool_title_link": "ÐÐ½Ð°Ð»Ð¸Ð· ÑÑÑÐ»ÐºÐ¸",
-        "tool_title_phone": "ÐÑÐ¾Ð²ÐµÑÐºÐ° Ð½Ð¾Ð¼ÐµÑÐ°",
-        "tool_title_maigret": "ÐÐ»ÑÐ±Ð¾ÐºÐ¸Ð¹ Ð¿Ð¾Ð¸ÑÐº",
-        "valid_username": "ÐÑÐ¿ÑÐ°Ð²ÑÑÐµ ÐºÐ¾ÑÑÐµÐºÑÐ½Ð¾Ðµ Ð¸Ð¼Ñ Ð¿Ð¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ.",
-        "valid_email": "ÐÐ¾ÑÐ¾Ð¶Ðµ, ÑÐ¾ÑÐ¼Ð°Ñ ÑÐ»ÐµÐºÑÑÐ¾Ð½Ð½Ð¾Ð¹ Ð¿Ð¾ÑÑÑ Ð½ÐµÐ²ÐµÑÐ½ÑÐ¹.",
-        "valid_url": "ÐÑÐ¿ÑÐ°Ð²ÑÑÐµ ÐºÐ¾ÑÑÐµÐºÑÐ½ÑÑ ÑÑÑÐ»ÐºÑ HTTP Ð¸Ð»Ð¸ HTTPS.",
-        "unknown_tool": "ÐÐµÐ¸Ð·Ð²ÐµÑÑÐ½ÑÐ¹ Ð¸Ð½ÑÑÑÑÐ¼ÐµÐ½Ñ. ÐÑÐ¿Ð¾Ð»ÑÐ·ÑÐ¹ÑÐµ /start, ÑÑÐ¾Ð±Ñ Ð¾ÑÐºÑÑÑÑ Ð¼ÐµÐ½Ñ.",
-        "scan_failed": "ÐÑÐ¾Ð²ÐµÑÐºÐ° Ð½Ðµ ÑÐ´Ð°Ð»Ð°ÑÑ. ÐÐ¾ÑÐ¼Ð¾ÑÑÐ¸ÑÐµ Ð¾ÑÐ¸Ð±ÐºÑ Ð² Ð»Ð¾Ð³Ð°Ñ Render.",
-        "other": "ÐÑÐ¿ÑÐ°Ð²ÑÑÐµ ÑÐµÐºÑÑ Ð¸Ð»Ð¸ Ð¸ÑÐ¿Ð¾Ð»ÑÐ·ÑÐ¹ÑÐµ /start, ÑÑÐ¾Ð±Ñ Ð²ÑÐ±ÑÐ°ÑÑ Ð¸Ð½ÑÑÑÑÐ¼ÐµÐ½Ñ.",
-        "report_caption": "Aegis Recon | HTML-Ð¾ÑÑÑÑ",
-        "report_user": "ÐÑÑÑÑ Aegis Recon Ð´Ð»Ñ {username}",
-        "prompt_header": "{tool}\n\n{prompt}\n\nÐÑÐ¿Ð¾Ð»ÑÐ·ÑÐ¹ÑÐµ /start, ÑÑÐ¾Ð±Ñ Ð¾ÑÐºÑÑÑÑ Ð³Ð»Ð°Ð²Ð½Ð¾Ðµ Ð¼ÐµÐ½Ñ.",
+        "ask_username": "Отправьте имя пользователя для поиска через Blackbird.",
+        "ask_email": "Отправьте адрес электронной почты для проверки.",
+        "ask_link": "Отправьте ссылку для анализа через VirusTotal.",
+        "ask_phone": "Отправьте номер в международном формате, например +79991234567.",
+        "ask_maigret": "Отправьте имя пользователя для глубокого поиска Maigret. Это может занять несколько минут.",
+        "welcome_no_tool": "Добро пожаловать в Aegis Recon. Используйте /start, чтобы выбрать инструмент.",
+        "cancelled": "Операция отменена.",
+        "scanning": "Выполняется проверка... Подождите.",
+        "unexpected": "Ошибка проверки: получен неожиданный ответ.",
+        "valid_phone": "Отправьте номер в международном формате, например +79991234567.",
+        "phone_checking": "Проверяю информацию о номере...",
+        "phone_error": "Ошибка проверки: {error}",
+        "phone_complete": "Проверка номера завершена. Готовлю HTML-отчёт...",
+        "phone_failed": "Не удалось проверить номер. Проверьте логи Render.",
+        "maigret_running": "Запускаю Maigret для {username}. Это может занять несколько минут.",
+        "report_sending": "Анализ завершён. Отправляю отчёт...",
+        "maigret_no_report": "Maigret не создал отчёт. Проверьте логи Render.",
+        "maigret_failed": "Ошибка Maigret. Проверьте логи Render.",
+        "tool_title_username": "Поиск имени",
+        "tool_title_email": "Проверка почты",
+        "tool_title_link": "Анализ ссылки",
+        "tool_title_phone": "Проверка номера",
+        "tool_title_maigret": "Глубокий поиск",
+        "valid_username": "Отправьте корректное имя пользователя.",
+        "valid_email": "Похоже, формат электронной почты неверный.",
+        "valid_url": "Отправьте корректную ссылку HTTP или HTTPS.",
+        "unknown_tool": "Неизвестный инструмент. Используйте /start, чтобы открыть меню.",
+        "scan_failed": "Проверка не удалась. Посмотрите ошибку в логах Render.",
+        "other": "Отправьте текст или используйте /start, чтобы выбрать инструмент.",
+        "report_caption": "Aegis Recon | HTML-отчёт",
+        "report_user": "Отчёт Aegis Recon для {username}",
+        "prompt_header": "{tool}\n\n{prompt}\n\nИспользуйте /start, чтобы открыть главное меню.",
         "help_short": (
-            "/username â Ð¿Ð¾Ð¸ÑÐº Ð¸Ð¼ÐµÐ½Ð¸\n"
-            "/maigret â Ð³Ð»ÑÐ±Ð¾ÐºÐ¸Ð¹ Ð¿Ð¾Ð¸ÑÐº\n"
-            "/email â Ð¿ÑÐ¾Ð²ÐµÑÐºÐ° Ð¿Ð¾ÑÑÑ\n"
-            "/link â Ð°Ð½Ð°Ð»Ð¸Ð· ÑÑÑÐ»ÐºÐ¸\n"
-            "/phone â Ð¿ÑÐ¾Ð²ÐµÑÐºÐ° Ð½Ð¾Ð¼ÐµÑÐ°\n"
-            "/start â Ð³Ð»Ð°Ð²Ð½Ð¾Ðµ Ð¼ÐµÐ½Ñ"
+            "/username — поиск имени\n"
+            "/maigret — глубокий поиск\n"
+            "/email — проверка почты\n"
+            "/link — анализ ссылки\n"
+            "/phone — проверка номера\n"
+            "/start — главное меню"
         ),
     },
     "pl": {
-        "language_button": "ðµð± JÄzyk",
-        "start_button": "ð Rozpocznij analizÄ",
-        "delete_button": "ð WyczyÅÄ czat",
+        "language_button": "🇵🇱 Język",
+        "start_button": "🔍 Rozpocznij analizę",
+        "delete_button": "🗑 Wyczyść czat",
         "welcome": (
-            "ð¡ï¸ *Aegis Recon*\n\n"
-            "Zestaw narzÄdzi do analizy OSINT.\n\n"
-            "*DostÄpne moduÅy:*\n"
-            "â¢ Wyszukiwanie nazwy uÅ¼ytkownika â Blackbird\n"
-            "â¢ Wyszukiwanie zaawansowane â Maigret\n"
-            "â¢ Analiza e-maila â Blackbird + publiczne rekordy MX\n"
-            "â¢ Analiza linkÃ³w â VirusTotal\n"
-            "â¢ Analiza numeru telefonu â bezpÅatna analiza lokalna\n\n"
-            "_Korzystaj wyÅÄcznie zgodnie z prawem i za zgodÄ._"
+            "🛡️ *Aegis Recon*\n\n"
+            "Zestaw narzędzi do analizy OSINT.\n\n"
+            "*Dostępne moduły:*\n"
+            "• Wyszukiwanie nazwy użytkownika — Blackbird\n"
+            "• Wyszukiwanie zaawansowane — Maigret\n"
+            "• Analiza e-maila — Blackbird + publiczne rekordy MX\n"
+            "• Analiza linków — VirusTotal\n"
+            "• Analiza numeru telefonu — bezpłatna analiza lokalna\n\n"
+            "_Korzystaj wyłącznie zgodnie z prawem i za zgodą._"
         ),
-        "main_menu": "Aegis Recon â Menu gÅÃ³wne",
+        "main_menu": "Aegis Recon — Menu główne",
         "username": "Szukaj nazwy",
-        "maigret": "GÅÄbokie wyszukiwanie",
+        "maigret": "Głębokie wyszukiwanie",
         "email": "Analiza e-maila",
         "link": "Analiza linku",
         "phone": "Numer telefonu",
         "help": "Pomoc",
-        "language_title": "ð Wybierz jÄzyk:",
-        "back": "â¬ï¸ WrÃ³Ä",
-        "language_changed": "Zmieniono jÄzyk na polski ðµð±",
-        "language_current": "Aktualny jÄzyk: polski ðµð±",
-        "cleanup_no_chat": "Nie moÅ¼na ustaliÄ czatu.",
+        "language_title": "🌐 Wybierz język:",
+        "back": "⬅️ Wróć",
+        "language_changed": "Zmieniono język na polski 🇵🇱",
+        "language_current": "Aktualny język: polski 🇵🇱",
+        "cleanup_no_chat": "Nie można ustalić czatu.",
         "cleanup_done": (
-            "Czyszczenie czatu zakoÅczone.\n"
-            "UsuniÄte wiadomoÅci: {deleted}.\n"
-            "Nie udaÅo siÄ usunÄÄ: {failed}.\n\n"
-            "Telegram nie pozwala botom zagwarantowaÄ usuniÄcia caÅej historii. "
-            "Starsze wiadomoÅci moÅ¼esz usunÄÄ rÄcznie w Telegramie."
+            "Czyszczenie czatu zakończone.\n"
+            "Usunięte wiadomości: {deleted}.\n"
+            "Nie udało się usunąć: {failed}.\n\n"
+            "Telegram nie pozwala botom zagwarantować usunięcia całej historii. "
+            "Starsze wiadomości możesz usunąć ręcznie w Telegramie."
         ),
         "help_text": (
             "*Pomoc Aegis Recon*\n\n"
-            "/start â menu gÅÃ³wne\n"
-            "/help â pomoc\n"
-            "/username â wyszukiwanie nazwy uÅ¼ytkownika\n"
-            "/maigret username â wyszukiwanie zaawansowane\n"
-            "/email â analiza e-maila\n"
-            "/link â analiza adresu URL\n"
-            "/phone â analiza numeru telefonu\n\n"
-            "Wybierz narzÄdzie, wyÅlij cel i poczekaj na raport HTML.\n\n"
-            "Korzystaj tylko z danych i usÅug, do ktÃ³rych masz uprawniony dostÄp."
+            "/start — menu główne\n"
+            "/help — pomoc\n"
+            "/username — wyszukiwanie nazwy użytkownika\n"
+            "/maigret username — wyszukiwanie zaawansowane\n"
+            "/email — analiza e-maila\n"
+            "/link — analiza adresu URL\n"
+            "/phone — analiza numeru telefonu\n\n"
+            "Wybierz narzędzie, wyślij cel i poczekaj na raport HTML.\n\n"
+            "Korzystaj tylko z danych i usług, do których masz uprawniony dostęp."
         ),
-        "ask_username": "WyÅlij nazwÄ uÅ¼ytkownika do wyszukania przez Blackbird.",
-        "ask_email": "WyÅlij adres e-mail do analizy.",
-        "ask_link": "WyÅlij adres URL do analizy przez VirusTotal.",
-        "ask_phone": "WyÅlij numer telefonu w formacie miÄdzynarodowym, np. +48123456789.",
-        "ask_maigret": "WyÅlij nazwÄ uÅ¼ytkownika do gÅÄbokiego wyszukiwania Maigret. MoÅ¼e to potrwaÄ kilka minut.",
-        "welcome_no_tool": "Witaj w Aegis Recon. UÅ¼yj /start, aby wybraÄ narzÄdzie.",
+        "ask_username": "Wyślij nazwę użytkownika do wyszukania przez Blackbird.",
+        "ask_email": "Wyślij adres e-mail do analizy.",
+        "ask_link": "Wyślij adres URL do analizy przez VirusTotal.",
+        "ask_phone": "Wyślij numer telefonu w formacie międzynarodowym, np. +48123456789.",
+        "ask_maigret": "Wyślij nazwę użytkownika do głębokiego wyszukiwania Maigret. Może to potrwać kilka minut.",
+        "welcome_no_tool": "Witaj w Aegis Recon. Użyj /start, aby wybrać narzędzie.",
         "cancelled": "Operacja anulowana.",
-        "scanning": "Skanowanie... ProszÄ czekaÄ.",
-        "unexpected": "BÅÄd wyszukiwania: nieoczekiwana odpowiedÅº.",
-        "valid_phone": "WyÅlij numer telefonu w formacie miÄdzynarodowym, np. +48123456789.",
+        "scanning": "Skanowanie... Proszę czekać.",
+        "unexpected": "Błąd wyszukiwania: nieoczekiwana odpowiedź.",
+        "valid_phone": "Wyślij numer telefonu w formacie międzynarodowym, np. +48123456789.",
         "phone_checking": "Sprawdzanie informacji o numerze...",
-        "phone_error": "BÅÄd wyszukiwania: {error}",
-        "phone_complete": "Analiza numeru zakoÅczona. PrzygotowujÄ raport HTML...",
-        "phone_failed": "Nie udaÅo siÄ przeanalizowaÄ numeru. SprawdÅº logi Render.",
-        "maigret_running": "Uruchamiam Maigret dla {username}. MoÅ¼e to potrwaÄ kilka minut.",
-        "report_sending": "Analiza zakoÅczona. WysyÅam raport...",
-        "maigret_no_report": "Maigret nie utworzyÅ raportu. SprawdÅº logi Render.",
-        "maigret_failed": "Maigret nie dziaÅa poprawnie. SprawdÅº logi Render.",
+        "phone_error": "Błąd wyszukiwania: {error}",
+        "phone_complete": "Analiza numeru zakończona. Przygotowuję raport HTML...",
+        "phone_failed": "Nie udało się przeanalizować numeru. Sprawdź logi Render.",
+        "maigret_running": "Uruchamiam Maigret dla {username}. Może to potrwać kilka minut.",
+        "report_sending": "Analiza zakończona. Wysyłam raport...",
+        "maigret_no_report": "Maigret nie utworzył raportu. Sprawdź logi Render.",
+        "maigret_failed": "Maigret nie działa poprawnie. Sprawdź logi Render.",
         "tool_title_username": "Wyszukiwanie nazwy",
         "tool_title_email": "Analiza e-maila",
         "tool_title_link": "Analiza linku",
         "tool_title_phone": "Numer telefonu",
-        "tool_title_maigret": "GÅÄbokie wyszukiwanie",
-        "valid_username": "WyÅlij prawidÅowÄ nazwÄ uÅ¼ytkownika.",
-        "valid_email": "Format adresu e-mail wydaje siÄ nieprawidÅowy.",
-        "valid_url": "WyÅlij prawidÅowy adres HTTP lub HTTPS.",
-        "unknown_tool": "Nieznane narzÄdzie. UÅ¼yj /start, aby otworzyÄ menu.",
-        "scan_failed": "Skanowanie nie powiodÅo siÄ. SprawdÅº logi Render.",
-        "other": "WyÅlij tekst lub uÅ¼yj /start, aby wybraÄ narzÄdzie.",
+        "tool_title_maigret": "Głębokie wyszukiwanie",
+        "valid_username": "Wyślij prawidłową nazwę użytkownika.",
+        "valid_email": "Format adresu e-mail wydaje się nieprawidłowy.",
+        "valid_url": "Wyślij prawidłowy adres HTTP lub HTTPS.",
+        "unknown_tool": "Nieznane narzędzie. Użyj /start, aby otworzyć menu.",
+        "scan_failed": "Skanowanie nie powiodło się. Sprawdź logi Render.",
+        "other": "Wyślij tekst lub użyj /start, aby wybrać narzędzie.",
         "report_caption": "Aegis Recon | Raport HTML",
         "report_user": "Raport Aegis Recon dla {username}",
-        "prompt_header": "{tool}\n\n{prompt}\n\nUÅ¼yj /start, aby otworzyÄ menu gÅÃ³wne.",
+        "prompt_header": "{tool}\n\n{prompt}\n\nUżyj /start, aby otworzyć menu główne.",
         "help_short": (
-            "/username â wyszukiwanie nazwy\n"
-            "/maigret â gÅÄbokie wyszukiwanie\n"
-            "/email â analiza e-maila\n"
-            "/link â analiza URL\n"
-            "/phone â analiza numeru\n"
-            "/start â menu gÅÃ³wne"
+            "/username — wyszukiwanie nazwy\n"
+            "/maigret — głębokie wyszukiwanie\n"
+            "/email — analiza e-maila\n"
+            "/link — analiza URL\n"
+            "/phone — analiza numeru\n"
+            "/start — menu główne"
         ),
     },
 }
@@ -365,11 +366,11 @@ def tr(context, key, **kwargs):
 def language_keyboard(context):
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("ðºð¸ English", callback_data="lang_en"),
-            InlineKeyboardButton("ð·ðº Ð ÑÑÑÐºÐ¸Ð¹", callback_data="lang_ru"),
+            InlineKeyboardButton("🇺🇸 English", callback_data="lang_en"),
+            InlineKeyboardButton("🇷🇺 Русский", callback_data="lang_ru"),
         ],
         [
-            InlineKeyboardButton("ðµð± Polski", callback_data="lang_pl"),
+            InlineKeyboardButton("🇵🇱 Polski", callback_data="lang_pl"),
         ],
         [
             InlineKeyboardButton(tr(context, "back"), callback_data="language_back"),
@@ -484,7 +485,7 @@ def parse_blackbird_results(output):
         line = line.strip()
         if not line:
             continue
-        match = re.match(r"^(?:ð\s*)?(.{1,100}?):\s*(https?://\S+)$", line, flags=re.IGNORECASE)
+        match = re.match(r"^(?:🔗\s*)?(.{1,100}?):\s*(https?://\S+)$", line, flags=re.IGNORECASE)
         if match:
             site = match.group(1).strip()
             url = match.group(2).rstrip(".,;)")
